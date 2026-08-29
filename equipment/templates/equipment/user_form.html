@@ -1,0 +1,41 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}{{ title }} - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-panel { max-width: 520px; }
+    .field input[type="checkbox"] { width: auto; margin-right: 6px; }
+    .field.checkbox label { display: inline; font-weight: normal; color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'user_list' %}">← ユーザー管理へ戻る</a></div>
+
+<h1>{{ title }}</h1>
+
+<div class="panel form-panel">
+    <form method="post">
+        {% csrf_token %}
+
+        {% for field in form %}
+        <div class="field {% if field.field.widget.input_type == 'checkbox' %}checkbox{% endif %}">
+            {% if field.field.widget.input_type == 'checkbox' %}
+                {{ field }}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% else %}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+            {% endif %}
+            {% if field.help_text %}
+            <span class="helptext">{{ field.help_text|safe }}</span>
+            {% endif %}
+            {{ field.errors }}
+        </div>
+        {% endfor %}
+
+        <button type="submit">保存</button>
+    </form>
+</div>
+{% endblock %}

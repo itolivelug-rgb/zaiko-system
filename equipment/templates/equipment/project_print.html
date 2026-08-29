@@ -1,0 +1,65 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ project.name }} 機材リスト</title>
+    <link rel="stylesheet" href="{% static 'equipment/css/print.css' %}">
+    <style>
+        td.transfer { font-size: 8pt; color: #8a5a00; }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">印刷する</button>
+        <button onclick="window.close()">閉じる</button>
+        <div class="hint">
+            用紙サイズは A3 横 を想定しています。印刷ダイアログで変更できます。<br>
+            PDFとして保存する場合は、印刷ダイアログの「送信先」で「PDFに保存」を選んでください。<br>
+            上下に出るタイトル・URLを消すには、印刷ダイアログの「詳細設定」で「ヘッダーとフッター」のチェックを外してください。
+        </div>
+    </div>
+
+    <h1>{{ project.name }}</h1>
+    <div class="meta">
+        <span>担当者: {{ manager_name }}</span>
+        <span>件数: {{ total_count }} 件</span>
+        <span>出力日時: {{ printed_at|date:"Y-m-d H:i" }}</span>
+    </div>
+
+    <table>
+        <colgroup>
+            <col style="width: 12%">
+            <col style="width: 7%">
+            <col style="width: 13%">
+            <col style="width: 20%">
+            <col style="width: 24%">
+            <col style="width: 8%">
+            <col style="width: 16%">
+        </colgroup>
+        <thead>
+            <tr>
+                {% for header in headers %}
+                <th>{{ header }}</th>
+                {% endfor %}
+                <th>備考</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                {% if row.type == "tab" %}
+                <tr class="area-tab">
+                    <td colspan="{{ col_count }}">{{ row.label }}</td>
+                </tr>
+                {% else %}
+                <tr class="data-row{% if row.odd %} stripe{% endif %}">
+                    {% for cell in row.cells %}
+                    <td{% if forloop.first %} class="code"{% endif %}>{{ cell }}</td>
+                    {% endfor %}
+                    <td class="transfer">{% if row.transfer %}{{ row.transfer }}から載替{% endif %}</td>
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

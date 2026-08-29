@@ -1,0 +1,85 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}在庫管理システム{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'equipment/css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+    <script>
+        try {
+            if (localStorage.getItem("equipmentTheme") === "light") {
+                document.documentElement.setAttribute("data-theme", "light");
+            }
+        } catch (e) {}
+    </script>    
+</head>
+<body>
+    <header class="site-header">
+        <a href="{% url 'home' %}" class="home-link">
+            <img src="{% static 'equipment/img/logo.png' %}" alt="LIVE LUGGAGE" class="logo">
+            <span class="system-name">在庫管理システム</span>
+        </a>
+        <div class="spacer"></div>
+        {% if user.is_authenticated %}
+        <div class="user-info">
+            <span>{{ user.last_name }}{{ user.first_name }}{% if not user.last_name and not user.first_name %}{{ user.username }}{% endif %}</span>
+            <button type="button" id="theme-toggle" class="theme-toggle" title="表示モードを切り替えます">☾ ダーク</button>            
+            {% if user.is_staff %}
+            <a href="{% url 'user_list' %}">ユーザー管理</a>
+            {% endif %}
+            <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="link-style">ログアウト</button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    <main class="site-main">
+        {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_js %}{% endblock %}
+<script>
+(function () {
+    const KEY = "equipmentTheme";
+    const btn = document.getElementById("theme-toggle");
+
+    function apply(theme) {
+        if (theme === "light") {
+            document.documentElement.setAttribute("data-theme", "light");
+            if (btn) btn.textContent = "☀ ライト";
+        } else {
+            document.documentElement.removeAttribute("data-theme");
+            if (btn) btn.textContent = "☾ ダーク";
+        }
+    }
+
+    let current = "dark";
+    try {
+        current = localStorage.getItem(KEY) || "dark";
+    } catch (e) {}
+
+    apply(current);
+
+    if (btn) {
+        btn.addEventListener("click", function () {
+            current = current === "light" ? "dark" : "light";
+            try { localStorage.setItem(KEY, current); } catch (e) {}
+            apply(current);
+        });
+    }
+})();
+</script>    
+</body>
+</html>

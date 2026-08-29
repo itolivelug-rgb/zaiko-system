@@ -1,0 +1,48 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}更新履歴 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .subtitle { color: var(--text-muted); margin: -12px 0 20px; }
+    .changes { white-space: pre-wrap; font-size: 13px; }
+    td { vertical-align: top; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav">
+    <a href="{% url 'equipment_update' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">← 編集画面へ戻る</a>
+</div>
+
+<h1>更新履歴</h1>
+<p class="subtitle">{{ equipment.management_code }} / {{ equipment.model_name }}</p>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 150px;">日時</th>
+            <th style="width: 90px;">操作</th>
+            <th style="width: 140px;">操作者</th>
+            <th>変更内容</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for history in histories %}
+        <tr>
+            <td>{{ history.created_at|date:"Y-m-d H:i" }}</td>
+            <td><span class="action-badge action-{{ history.action }}">{{ history.get_action_display }}</span></td>
+            <td>
+                {% if history.user %}
+                    {{ history.user.last_name }}{{ history.user.first_name }}
+                    {% if not history.user.last_name and not history.user.first_name %}{{ history.user.username }}{% endif %}
+                {% else %}―{% endif %}
+            </td>
+            <td class="changes">{{ history.changes }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted">履歴がありません。</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

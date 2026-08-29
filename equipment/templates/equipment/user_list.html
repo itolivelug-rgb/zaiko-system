@@ -1,0 +1,55 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}ユーザー管理 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    tr.inactive td { color: var(--text-muted); }
+    .actions a { margin-right: 12px; font-size: 13px; }
+    .toolbar { margin-bottom: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'home' %}">← ホームへ戻る</a></div>
+
+<h1>ユーザー管理</h1>
+
+<div class="toolbar">
+    <a href="{% url 'user_create' %}" class="btn">＋ 新規ユーザーを追加</a>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>ユーザー名</th>
+            <th>氏名</th>
+            <th>権限</th>
+            <th>状態</th>
+            <th>最終ログイン</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr {% if not u.is_active %}class="inactive"{% endif %}>
+            <td>{{ u.username }}</td>
+            <td>{{ u.last_name }} {{ u.first_name }}</td>
+            <td>{% if u.is_staff %}<span class="badge badge-admin">管理者</span>{% else %}一般{% endif %}</td>
+            <td>
+                {% if u.is_active %}
+                <span class="badge badge-active">有効</span>
+                {% else %}
+                <span class="badge badge-inactive">無効</span>
+                {% endif %}
+            </td>
+            <td>{{ u.last_login|date:"Y-m-d H:i"|default:"―" }}</td>
+            <td class="actions">
+                <a href="{% url 'user_update' u.pk %}">編集</a>
+                <a href="{% url 'user_password' u.pk %}">パスワード変更</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination">
+    {% if page_obj.has_previous %}
+    <a href="?{{ pager_params }}&page={{ page_obj.previous_page_number }}">前へ</a>
+    {% else %}
+    <span class="text-muted">前へ</span>
+    {% endif %}
+
+    <span class="text-muted">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }} ページ</span>
+
+    {% if page_obj.has_next %}
+    <a href="?{{ pager_params }}&page={{ page_obj.next_page_number }}">次へ</a>
+    {% else %}
+    <span class="text-muted">次へ</span>
+    {% endif %}
+</div>
+{% endif %}

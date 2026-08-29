@@ -1,0 +1,120 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}返却 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mode-bar {
+        background: rgba(34, 177, 76, 0.15);
+        border: 1px solid var(--green);
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .mode-bar .mode-title { font-size: 18px; font-weight: 600; color: #4ade80; }
+    .mode-bar .mode-desc { font-size: 13px; color: var(--text-muted); }
+
+    .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+    .controls input[type="text"] { width: 260px; }
+
+    .project-card:hover { border-color: var(--green); }
+    .progress-label { color: var(--text-muted); }
+    .progress-label strong { color: #4ade80; font-size: 15px; }
+
+    .section-title.alert { color: #f87171; border-bottom-color: var(--danger); }
+    .section-title.warn { color: #fbbf24; border-bottom-color: var(--orange); }
+    .project-card.overdue { border-color: var(--danger); }
+    .project-card.overdue:hover { border-color: #f87171; }
+    .overdue .progress-label strong { color: #f87171; }
+    .project-card.loading { border-color: var(--orange); }
+    .project-card.loading:hover { border-color: #fbbf24; }
+    .loading .progress-label strong { color: #fbbf24; }
+    .project-card.finished { opacity: 0.7; }
+    .finished .progress-label strong { color: var(--text-muted); }
+    .status-note { font-size: 13px; color: #fbbf24; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'home' %}">← ホームへ戻る</a></div>
+
+<div class="mode-bar">
+    <span class="mode-title">返却処理</span>
+    <span class="mode-desc">現場 → 倉庫</span>
+</div>
+
+<form method="get" class="controls">
+    <input type="text" name="q" value="{{ keyword }}" placeholder="案件名で検索">
+    <button type="submit">検索</button>
+    {% if keyword %}<a href="{% url 'return_project_list' %}">クリア</a>{% endif %}
+</form>
+
+{% if overdue_projects %}
+<div class="section-title alert">返却待ち（{{ overdue_projects|length }}件）</div>
+<div class="project-grid">
+    {% for p in overdue_projects %}
+    <a href="{% url 'return_scan' p.pk %}" class="project-card overdue">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">返却予定 {{ p.return_date|date:"n/j (D)" }}（超過）</div>
+        <div class="card-foot">
+            <span class="progress-label">未返却 <strong>{{ p.pending_return }}</strong> / {{ p.total_count }}</span>
+            <span class="text-muted">{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="section-title">貸出中（{{ normal_projects|length }}件）</div>
+{% if normal_projects %}
+<div class="project-grid">
+    {% for p in normal_projects %}
+    <a href="{% url 'return_scan' p.pk %}" class="project-card">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span class="progress-label">未返却 <strong>{{ p.pending_return }}</strong> / {{ p.total_count }}</span>
+            <span class="text-muted">{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-msg">貸出中の案件はありません。</div>
+{% endif %}
+
+{% if loading_projects %}
+<div class="section-title warn">貸出処理中（{{ loading_projects|length }}件）</div>
+<div class="project-grid">
+    {% for p in loading_projects %}
+    <a href="{% url 'return_scan' p.pk %}" class="project-card loading">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span class="status-note">貸出処理が完了していません</span>
+            <span class="text-muted">{{ p.checked_out_count }} / {{ p.total_count }}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if recent_projects %}
+<div class="section-title">返却済み（{{ recent_projects|length }}件）</div>
+<div class="project-grid">
+    {% for p in recent_projects %}
+    <a href="{% url 'return_scan' p.pk %}" class="project-card finished">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">{{ p.returned_on|date:"n/j (D)" }} に返却完了</div>
+        <div class="card-foot">
+            <span class="progress-label">全 <strong>{{ p.total_count }}</strong> 点 返却済み</span>
+            <span class="text-muted">{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,74 @@
+{% extends "equipment/base.html" %}
+{% load static %}
+
+{% block title %}返却 - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mode-bar { background: rgba(34, 177, 76, 0.15); border: 1px solid var(--green); }
+    .mode-bar .mode-title { color: #4ade80; }
+    .pane-head.done { color: #4ade80; }
+    @keyframes flash {
+        0% { background: rgba(34, 177, 76, 0.4); }
+        100% { background: transparent; }
+    }
+    .submit-bar button { background: var(--green); color: #ffffff; }
+    .submit-bar button:hover { background: #4ade80; color: #14532d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'return_project_list' %}">← 案件選択へ戻る</a></div>
+
+<div class="mode-bar">
+    <span class="mode-title">返却処理</span>
+    <span class="mode-desc">現場 → 倉庫</span>
+    <span class="spacer"></span>
+    <span class="pname">{{ project.name }}</span>
+    <span class="mode-desc">{{ project.loan_date|date:"n/j (D)" }} 〜 {{ project.return_date|date:"n/j (D)" }}</span>
+</div>
+
+<div class="scan-box">
+    <label for="scan-input">品目コード</label>
+    <input type="text" id="scan-input" maxlength="10" autocomplete="off" autofocus placeholder="0000000000">
+    <span class="scan-msg" id="scan-msg"></span>
+</div>
+
+<div class="panes">
+    <div class="pane">
+        <div class="pane-head">未返却 <span class="cnt" id="pending-cnt"></span></div>
+        <div class="pane-body" id="pending-list"></div>
+    </div>
+    <div class="pane">
+        <div class="pane-head done">返却済み <span class="cnt" id="scanned-cnt"></span></div>
+        <div class="pane-body" id="scanned-list"></div>
+    </div>
+</div>
+
+<form method="post" id="scan-form">
+    {% csrf_token %}
+    <div id="hidden-inputs"></div>
+    <div class="submit-bar">
+        <button type="submit" id="submit-btn" disabled>機材を返却する</button>
+        <span class="text-muted" id="submit-note">読み込んだ機材はありません。</span>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'equipment/js/scan.js' %}"></script>
+<script>
+    initScanPage({
+        items: {{ items_json|safe }},
+        doneCodes: {{ done_json|safe }},
+        blockedCodes: {{ not_shipped_json|safe }},
+        labels: {
+            action: "返却処理",
+            allDone: "すべて返却しました。",
+            alreadyDone: "は返却済みです。",
+            blockedShort: "は未出庫です。",
+            blockedAlert: " はこの案件で出庫処理されていません。\n\n貸出処理を行うか、案件管理からこの機材を外してください。",
+        },
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "equipment/base.html" %}
+{% load static %}
+
+{% block title %}貸出 - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mode-bar { background: rgba(245, 166, 35, 0.15); border: 1px solid var(--orange); }
+    .mode-bar .mode-title { color: #fbbf24; }
+    .pane-head.done { color: #fbbf24; }
+    @keyframes flash {
+        0% { background: rgba(245, 166, 35, 0.4); }
+        100% { background: transparent; }
+    }
+    .submit-bar button { background: var(--orange); color: #412402; }
+    .submit-bar button:hover { background: #fbbf24; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'loan_project_list' %}">← 案件選択へ戻る</a></div>
+
+<div class="mode-bar">
+    <span class="mode-title">貸出処理</span>
+    <span class="mode-desc">倉庫 → 現場</span>
+    <span class="spacer"></span>
+    <span class="pname">{{ project.name }}</span>
+    <span class="mode-desc">{{ project.loan_date|date:"n/j (D)" }} 〜 {{ project.return_date|date:"n/j (D)" }}</span>
+</div>
+
+<div class="scan-box">
+    <label for="scan-input">品目コード</label>
+    <input type="text" id="scan-input" maxlength="10" autocomplete="off" autofocus placeholder="0000000000">
+    <span class="scan-msg" id="scan-msg"></span>
+</div>
+
+<div class="panes">
+    <div class="pane">
+        <div class="pane-head">未処理 <span class="cnt" id="pending-cnt"></span></div>
+        <div class="pane-body" id="pending-list"></div>
+    </div>
+    <div class="pane">
+        <div class="pane-head done">読み込み済み <span class="cnt" id="scanned-cnt"></span></div>
+        <div class="pane-body" id="scanned-list"></div>
+    </div>
+</div>
+
+<form method="post" id="scan-form">
+    {% csrf_token %}
+    <div id="hidden-inputs"></div>
+    <div class="submit-bar">
+        <button type="submit" id="submit-btn" disabled>機材を貸し出す</button>
+        <span class="text-muted" id="submit-note">読み込んだ機材はありません。</span>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'equipment/js/scan.js' %}"></script>
+<script>
+    initScanPage({
+        items: {{ items_json|safe }},
+        doneCodes: {{ done_json|safe }},
+        labels: {
+            action: "貸出処理",
+            allDone: "すべて読み込みました。",
+            alreadyDone: "は読み込み済みです。",
+        },
+    });
+</script>
+{% endblock %}

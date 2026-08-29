@@ -1,0 +1,296 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}機材を追加 - {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .project-bar {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+        font-size: 13px;
+    }
+    .project-bar .pname { font-size: 15px; font-weight: 600; }
+    .project-bar .pdate { color: var(--text-muted); }
+    .project-bar .spacer { flex: 1; }
+
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .controls input[type="text"] { width: 220px; }
+
+    .sw-self { background: var(--border); border: 1px solid var(--accent); }
+
+    .gantt-left { flex: 0 0 360px; }
+    .gantt-right-inner { min-width: 700px; }
+
+    .g-row.assigned { background: rgba(56, 189, 248, 0.08); }
+    .g-row.conflict { color: var(--text-muted); }
+    .g-track.assigned { background: rgba(56, 189, 248, 0.08); }
+
+    .col-check { width: 40px; text-align: center; flex: 0 0 40px; }
+    .col-check input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; vertical-align: middle; }
+    .col-code { width: 96px; flex: 0 0 96px; }
+    .col-area { width: 60px; flex: 0 0 60px; }
+
+    .day-cell { min-width: 34px; }
+    .day-cell.in-project { background: rgba(56, 189, 248, 0.06); }
+    .day-cell.p-start { border-left: 2px solid var(--accent); }
+    .day-cell.p-end { border-right: 2px solid var(--accent); }
+    .day-cell.in-project .d1, .day-cell.in-project .d2 { color: var(--accent); }
+    .day-cell.in-project.weekend .d1, .day-cell.in-project.weekend .d2 { color: #f87171; }
+
+    .g-track .project-span {
+        position: absolute; top: 0; bottom: 0;
+        background: rgba(56, 189, 248, 0.06);
+        border-left: 2px solid var(--accent);
+        border-right: 2px solid var(--accent);
+        pointer-events: none;
+    }
+    .bar-self { background: var(--border); border: 1px solid var(--accent); color: var(--text); }
+
+    .submit-bar { padding: 14px 0; }
+    .selected-count { color: var(--text-muted); font-size: 13px; }
+    .empty-msg { padding: 30px 0; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'project_detail' project.pk %}">← 案件詳細へ戻る</a></div>
+
+<h1>機材を追加</h1>
+
+<form method="get" id="range-form">
+    <input type="hidden" name="q" value="{{ keyword }}">
+    <input type="hidden" name="area" value="{{ selected_area }}">
+    <input type="hidden" name="kind" value="{{ selected_kind }}">
+    <input type="hidden" name="storage" value="{{ selected_storage }}">
+    <input type="hidden" name="loan" value="{{ selected_loan }}">
+    <input type="hidden" name="project" value="{{ selected_project }}">  
+
+    <div class="project-bar">
+        <span class="pname">{{ project.name }}</span>
+        <span class="pdate">{{ project.loan_date|date:"n/j (D)" }} 〜 {{ project.return_date|date:"n/j (D)" }}</span>
+        <span class="pdate">登録済み {{ project.total_count }} 点</span>
+        <span class="spacer"></span>
+        <span class="pdate">表示期間</span>
+        <input type="date" name="from" value="{{ range_start|date:'Y-m-d' }}">
+        <span class="pdate">〜</span>
+        <input type="date" name="to" value="{{ range_end|date:'Y-m-d' }}">
+        <button type="submit" class="secondary">変更</button>
+    </div>
+</form>
+
+<form method="get" class="controls">
+    <input type="hidden" name="from" value="{{ range_start|date:'Y-m-d' }}">
+    <input type="hidden" name="to" value="{{ range_end|date:'Y-m-d' }}">
+    <input type="text" name="q" value="{{ keyword }}" placeholder="品目コード / 機種 / 名称">
+
+    <select name="area">
+        <option value="">-- 領域 --</option>
+        {% for area in areas %}
+        <option value="{{ area.id }}" {% if selected_area == area.id|stringformat:"s" %}selected{% endif %}>{{ area.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="kind">
+        <option value="">-- 種別 --</option>
+    </select>
+
+    <select name="storage">
+        <option value="">-- 保管場所 --</option>
+        {% for storage in storages %}
+        <option value="{{ storage.id }}" {% if selected_storage == storage.id|stringformat:"s" %}selected{% endif %}>{{ storage.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="loan">
+        <option value="">-- 貸出状況 --</option>
+        <option value="instock"  {% if selected_loan == "instock" %}selected{% endif %}>予約なし</option>
+        <option value="reserved" {% if selected_loan == "reserved" %}selected{% endif %}>準備中</option>
+        <option value="onloan"   {% if selected_loan == "onloan" %}selected{% endif %}>貸出中</option>
+    </select>
+
+    <select name="project">
+        <option value="">-- 案件 --</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if selected_project == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>    
+
+    <button type="submit">検索</button>
+    <a href="{% url 'project_add_equipment' project.pk %}">クリア</a>
+</form>
+
+<div class="legend">
+    <span><i class="swatch sw-self"></i>この案件</span>
+    <span><i class="swatch sw-preparing"></i>準備中</span>
+    <span><i class="swatch sw-on_loan"></i>貸出中</span>
+    <span><i class="swatch sw-finished"></i>終了</span>
+</div>
+
+<div class="count">{{ page_obj.end_index }} / {{ total_count }} 件</div>
+{% include "equipment/_pagination.html" %}
+
+<form method="post" id="add-form">
+    {% csrf_token %}
+    <input type="hidden" name="query_string" value="{{ query_string }}">
+
+    {% if rows %}
+    <div class="gantt">
+        <div class="gantt-left">
+            <div class="g-head">
+                <span class="col-check"><input type="checkbox" id="check-all" title="表示中をすべて選択"></span>
+                <span class="col-code">品目コード</span>
+                <span class="col-area">領域</span>
+                <span class="col-model">機種</span>
+            </div>
+            {% for row in rows %}
+            <div class="g-row {% if row.assigned %}assigned{% elif row.conflict %}conflict{% endif %}">
+                <span class="col-check">
+                    {% if not row.conflict %}
+                    <input type="checkbox" name="equipment_ids" value="{{ row.equipment.id }}" class="eq-check"
+                           {% if row.assigned %}checked{% endif %}
+                           {% if row.checked_out %}data-checked-out="1"{% endif %}>
+                    <input type="hidden" name="shown_ids" value="{{ row.equipment.id }}">
+                    {% endif %}
+                </span>
+                <span class="col-code">{{ row.equipment.management_code }}</span>
+                <span class="col-area">{{ row.equipment.area.name }}</span>
+                <span class="col-model" title="{{ row.equipment.model_name }}">{{ row.equipment.model_name }}</span>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="gantt-right">
+            <div class="gantt-right-inner" style="min-width: {{ gantt_min_width }}px;">
+                <div class="day-head">
+                    {% for day in days %}
+                    <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.in_project %} in-project{% endif %}{% if day.is_start %} p-start{% endif %}{% if day.is_end %} p-end{% endif %}">
+                        <div class="d1">{{ day.date|date:"n/j" }}</div>
+                        <div class="d2">{{ day.date|date:"D" }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% for row in rows %}
+                <div class="g-track{% if row.assigned %} assigned{% endif %}">
+                    {% if self_visible %}
+                    <div class="project-span" style="left: {{ self_left }}%; width: {{ self_width }}%;"></div>
+                    {% endif %}
+                    {% for bar in row.bars %}
+                    <div class="bar bar-{{ bar.state }}" style="left: {{ bar.left }}%; width: {{ bar.width }}%;"
+                         title="{{ bar.name }}（{{ bar.state_label }}）">{{ bar.name }}</div>
+                    {% endfor %}
+                    {% if row.assigned and self_visible %}
+                    <div class="bar bar-self" style="left: {{ self_left }}%; width: {{ self_width }}%;">この案件</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-msg">該当するデータがありません。</div>
+    {% endif %}
+
+    <div class="submit-bar">
+        <button type="submit">選択内容を反映</button>
+        <span class="selected-count" id="selected-count">0 点を選択中</span>
+    </div>
+</form>
+
+{% include "equipment/_pagination.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const allKinds = [
+        {% for kind in all_kinds %}
+        { id: "{{ kind.id }}", name: "{{ kind.name|escapejs }}", areaId: "{{ kind.area_id }}" },
+        {% endfor %}
+    ];
+    const selectedKindId = "{{ selected_kind }}";
+    const areaSelect = document.querySelector('.controls select[name="area"]');
+    const kindSelect = document.querySelector('.controls select[name="kind"]');
+
+    function updateKindOptions(keepSelection) {
+        const selectedArea = areaSelect.value;
+        const currentKind = keepSelection ? selectedKindId : "";
+        kindSelect.innerHTML = '<option value="">-- 種別 --</option>';
+        allKinds.forEach(function (kind) {
+            if (!selectedArea || kind.areaId === selectedArea) {
+                const option = document.createElement("option");
+                option.value = kind.id;
+                option.textContent = kind.name;
+                if (kind.id === currentKind) option.selected = true;
+                kindSelect.appendChild(option);
+            }
+        });
+    }
+    areaSelect.addEventListener("change", function () { updateKindOptions(false); });
+    updateKindOptions(true);
+</script>
+
+<script>
+    const checkAll = document.getElementById("check-all");
+    const checks = document.querySelectorAll(".eq-check");
+    const countLabel = document.getElementById("selected-count");
+
+    function updateCount() {
+        const n = document.querySelectorAll(".eq-check:checked").length;
+        countLabel.textContent = n + " 点を選択中";
+    }
+
+    if (checkAll) {
+        checkAll.addEventListener("change", function () {
+            checks.forEach(function (c) { c.checked = checkAll.checked; });
+            updateCount();
+        });
+    }
+
+    checks.forEach(function (c) {
+        c.addEventListener("change", function () {
+            if (!c.checked && c.dataset.checkedOut === "1") {
+                if (!confirm("この機材は出庫済みです。\n案件から外すと在庫扱いに戻りますが、よろしいですか？")) {
+                    c.checked = true;
+                }
+            }
+            updateCount();
+        });
+    });
+
+    document.querySelectorAll(".gantt-left .g-row").forEach(function (rowEl) {
+        rowEl.addEventListener("click", function (e) {
+            if (e.target.tagName === "INPUT") return;
+            const box = rowEl.querySelector(".eq-check");
+            if (box) {
+                box.checked = !box.checked;
+                box.dispatchEvent(new Event("change"));
+            }
+        });
+    });
+
+
+    updateCount();
+</script>
+
+<script>
+    // 左右の行の高さを揃える（機種名が長い場合の保険）
+    window.addEventListener("load", function () {
+        const leftRows = document.querySelectorAll(".gantt-left .g-row");
+        const rightRows = document.querySelectorAll(".gantt-right .g-track");
+        leftRows.forEach(function (el, i) {
+            if (rightRows[i]) {
+                const h = Math.max(el.offsetHeight, rightRows[i].offsetHeight);
+                el.style.height = h + "px";
+                rightRows[i].style.height = h + "px";
+            }
+        });
+    });
+</script>
+{% endblock %}

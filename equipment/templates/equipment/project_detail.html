@@ -1,0 +1,144 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}{{ project.name }} - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .project-head {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+    }
+    .project-head .head-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 12px;
+    }
+    .project-head h1 { margin: 0; font-size: 20px; }
+    .project-meta { display: flex; gap: 28px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
+    .project-meta strong { color: var(--text); font-weight: 600; }
+    .project-notes { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; white-space: pre-wrap; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 3px;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .status-preparing { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid var(--border-light); }
+    .status-on_loan   { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .status-overdue   { background: rgba(220, 53, 69, 0.15); color: #f87171; border: 1px solid var(--danger); }
+    .status-finished  { background: rgba(34, 177, 76, 0.15); color: #4ade80; border: 1px solid var(--green); }
+
+    .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .toolbar-sep { flex: 1; }
+
+    .area-tab td {
+        background: #2a3a5c;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        padding: 5px 12px;
+    }
+    .code-cell { font-family: "Consolas", monospace; white-space: nowrap; }
+    .empty-msg { color: var(--text-muted); padding: 30px 0; text-align: center; }
+
+    .progress { font-size: 13px; color: var(--text-muted); }
+    .progress strong { color: var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'project_list' %}">← 案件管理へ戻る</a></div>
+
+<div class="project-head">
+    <div class="head-top">
+        <h1>{{ project.name }}</h1>
+        <span class="status-badge status-{{ project.status }}">{{ project.status_label }}</span>
+    </div>
+    <div class="project-meta">
+        <span>貸出: <strong>{{ project.loan_date|date:"Y/n/j (D)" }}</strong></span>
+        <span>返却予定: <strong>{{ project.return_date|date:"Y/n/j (D)" }}</strong></span>
+        <span>担当: <strong>{% if project.manager %}{{ project.manager.last_name }}{{ project.manager.first_name }}{% if not project.manager.last_name and not project.manager.first_name %}{{ project.manager.username }}{% endif %}{% else %}―{% endif %}</strong></span>
+        <span>機材: <strong>{{ project.total_count }} 点</strong></span>
+    </div>
+    {% if project.notes %}
+    <div class="project-notes">{{ project.notes }}</div>
+    {% endif %}
+</div>
+
+<div class="toolbar">
+    {% if project.status != "finished" %}
+    <a href="{% url 'project_add_equipment' project.pk %}" class="btn">＋ 機材を追加</a>
+    <a href="{% url 'project_update' project.pk %}">案件情報を編集</a>
+    {% else %}
+    <span class="text-muted">この案件は終了しています。機材の変更はできません。</span>
+    {% endif %}
+    {% if project.total_count %}
+    <button type="button" id="print-btn" class="secondary">機材リストを印刷</button>
+    {% endif %}
+    {% if project.is_deleted %}
+    <form method="post" action="{% url 'project_restore' project.pk %}" style="display:inline;">
+        {% csrf_token %}
+        <button type="submit" class="secondary">復元する</button>
+    </form>
+    {% endif %}
+    <span class="toolbar-sep"></span>
+    <span class="progress">
+        出庫 <strong>{{ project.checked_out_count }}</strong> / {{ project.total_count }}　　
+        返却 <strong>{{ project.returned_count }}</strong> / {{ project.total_count }}
+    </span>
+</div>
+
+{% if grouped %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 120px;">品目コード</th>
+            <th style="width: 150px;">種別</th>
+            <th style="width: 200px;">機種</th>
+            <th>名称</th>
+            <th style="width: 90px;">保管場所</th>
+            <th style="width: 100px;">状態</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for group in grouped %}
+        <tr class="area-tab"><td colspan="6">{{ group.area }}</td></tr>
+        {% for a in group.items %}
+        <tr>
+            <td class="code-cell">{{ a.equipment.management_code }}</td>
+            <td>{{ a.equipment.kind.name }}</td>
+            <td>{{ a.equipment.model_name }}</td>
+            <td>{{ a.equipment.name }}</td>
+            <td>{{ a.equipment.storage_location.name|default:"" }}</td>
+            <td>
+                {% if a.returned_at %}返却済み
+                {% elif a.checked_out_at %}出庫済み
+                {% else %}未出庫{% endif %}
+            </td>
+
+        </tr>
+        {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-msg">まだ機材が登録されていません。</div>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+    const printBtn = document.getElementById("print-btn");
+    if (printBtn) {
+        printBtn.addEventListener("click", function () {
+            window.open("{% url 'project_print' project.pk %}", "_blank");
+        });
+    }
+</script>
+{% endblock %}

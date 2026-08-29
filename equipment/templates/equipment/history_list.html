@@ -1,0 +1,90 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}更新履歴 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .controls input[type="text"] { width: 240px; }
+
+    td { vertical-align: top; }
+    .changes { white-space: pre-wrap; font-size: 13px; }
+    .code-cell { font-family: "Consolas", monospace; white-space: nowrap; }
+    .datetime { white-space: nowrap; font-size: 13px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav">
+    <a href="{% url 'equipment_list' %}">← 品目一覧へ戻る</a>
+</div>
+
+<h1>更新履歴</h1>
+
+<div class="toolbar">
+    <a href="{% url 'equipment_list' %}?deleted=1">削除済みの機材を表示</a>
+</div>
+
+<form method="get" class="controls">
+    <input type="text" name="q" value="{{ keyword }}" placeholder="品目コード / 機種">
+
+    <select name="action">
+        <option value="">-- 操作 --</option>
+        {% for value, label in action_choices %}
+        <option value="{{ value }}" {% if selected_action == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="user">
+        <option value="">-- 操作者 --</option>
+        {% for op in operators %}
+        <option value="{{ op.id }}" {% if selected_user == op.id|stringformat:"s" %}selected{% endif %}>
+            {{ op.last_name }}{{ op.first_name }}{% if not op.last_name and not op.first_name %}{{ op.username }}{% endif %}
+        </option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">検索</button>
+    <a href="{% url 'history_list' %}">クリア</a>
+</form>
+
+<div class="count">{{ page_obj.end_index }} / {{ total_count }} 件</div>
+{% include "equipment/_pagination.html" %}
+
+<table>
+    <thead>
+        <tr>
+            <th style="width: 130px;">日時</th>
+            <th style="width: 80px;">操作</th>
+            <th style="width: 110px;">品目コード</th>
+            <th style="width: 180px;">機種</th>
+            <th style="width: 110px;">操作者</th>
+            <th>変更内容</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for history in page_obj %}
+        <tr>
+            <td class="datetime">{{ history.created_at|date:"Y-m-d H:i" }}</td>
+            <td><span class="action-badge action-{{ history.action }}">{{ history.get_action_display }}</span></td>
+            <td class="code-cell">
+                <a href="{% url 'equipment_update' history.equipment.pk %}?next={{ current_url|urlencode }}">{{ history.equipment.management_code }}</a>
+            </td>
+            <td>{{ history.equipment.model_name }}</td>
+            <td>
+                {% if history.user %}
+                    {{ history.user.last_name }}{{ history.user.first_name }}
+                    {% if not history.user.last_name and not history.user.first_name %}{{ history.user.username }}{% endif %}
+                {% else %}―{% endif %}
+            </td>
+            <td class="changes">{{ history.changes }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted">該当する履歴がありません。</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% include "equipment/_pagination.html" %}
+{% endblock %}

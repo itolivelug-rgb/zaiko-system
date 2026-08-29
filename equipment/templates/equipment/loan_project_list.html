@@ -1,0 +1,76 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}貸出 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mode-bar {
+        background: rgba(245, 166, 35, 0.15);
+        border: 1px solid var(--orange);
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .mode-bar .mode-title { font-size: 18px; font-weight: 600; color: #fbbf24; }
+    .mode-bar .mode-desc { font-size: 13px; color: var(--text-muted); }
+
+    .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+    .controls input[type="text"] { width: 260px; }
+
+    .project-card:hover { border-color: var(--orange); }
+    .progress-label { color: var(--text-muted); }
+    .progress-label strong { color: #fbbf24; font-size: 15px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'home' %}">← ホームへ戻る</a></div>
+
+<div class="mode-bar">
+    <span class="mode-title">貸出処理</span>
+    <span class="mode-desc">倉庫 → 現場</span>
+</div>
+
+<form method="get" class="controls">
+    <input type="text" name="q" value="{{ keyword }}" placeholder="案件名で検索">
+    <button type="submit">検索</button>
+    {% if keyword %}<a href="{% url 'loan_project_list' %}">クリア</a>{% endif %}
+</form>
+
+<div class="section-title">出庫待ち（{{ pending_projects|length }}件）</div>
+{% if pending_projects %}
+<div class="project-grid">
+    {% for p in pending_projects %}
+    <a href="{% url 'loan_scan' p.pk %}" class="project-card">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span class="progress-label">出庫 <strong>{{ p.checked_out_count }}</strong> / {{ p.total_count }}</span>
+            <span class="text-muted">{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-msg">出庫待ちの案件はありません。</div>
+{% endif %}
+
+{% if other_projects %}
+<div class="section-title">出庫済み（{{ other_projects|length }}件）</div>
+<div class="project-grid">
+    {% for p in other_projects %}
+    <a href="{% url 'loan_scan' p.pk %}" class="project-card">
+        <div class="card-name">{{ p.name }}</div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span class="progress-label">出庫 <strong>{{ p.checked_out_count }}</strong> / {{ p.total_count }}</span>
+            <span class="text-muted">{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

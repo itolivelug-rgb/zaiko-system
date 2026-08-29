@@ -1,0 +1,123 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}案件管理 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .toolbar-sep { flex: 1; }
+    .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 24px; }
+    .controls input[type="text"] { width: 260px; }
+    .subtle-link { font-size: 12px; color: var(--text-muted); }
+    .subtle-link:hover { color: var(--accent); }
+
+    .project-grid { scroll-snap-type: x proximity; }
+    .project-grid::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+    .project-card { scroll-snap-align: start; }
+    .project-card:hover { border-color: var(--accent); }
+
+    .project-card .card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .project-card .card-name { margin-bottom: 0; }
+    .project-card .card-dates { margin-bottom: 6px; }
+    .project-card .card-foot { color: var(--text-muted); margin-top: 10px; }
+
+    .status-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .status-preparing { background: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid var(--border-light); }
+    .status-on_loan   { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .status-overdue   { background: rgba(220, 53, 69, 0.15); color: #f87171; border: 1px solid var(--danger); }
+    .status-finished  { background: rgba(34, 177, 76, 0.15); color: #4ade80; border: 1px solid var(--green); }
+
+    .deleted-notice {
+        background: rgba(220, 53, 69, 0.12);
+        border: 1px solid var(--danger);
+        border-radius: 4px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
+        font-size: 13px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'home' %}">← ホームへ戻る</a></div>
+
+<h1>案件管理{% if show_deleted %}（削除済み）{% endif %}</h1>
+
+{% if show_deleted %}
+<div class="deleted-notice">
+    削除済みの案件を表示しています。案件を開いて「復元」できます。
+</div>
+{% endif %}
+
+<div class="toolbar">
+    {% if not show_deleted %}
+    <a href="{% url 'project_create' %}" class="btn">＋ 新規案件を登録</a>
+    <span class="toolbar-sep"></span>
+    <a href="?deleted=1" class="subtle-link">削除済みを表示</a>
+    {% else %}
+    <a href="{% url 'project_list' %}">← 通常の一覧に戻る</a>
+    {% endif %}
+</div>
+
+<form method="get" class="controls">
+    {% if show_deleted %}<input type="hidden" name="deleted" value="1">{% endif %}
+    <input type="text" name="q" value="{{ keyword }}" placeholder="案件名で検索">
+    <button type="submit">検索</button>
+    {% if keyword %}<a href="{% url 'project_list' %}{% if show_deleted %}?deleted=1{% endif %}">クリア</a>{% endif %}
+</form>
+
+<div class="section-title">進行中・予定（{{ active_projects|length }}件）</div>
+{% if active_projects %}
+<div class="project-grid">
+    {% for p in active_projects %}
+    <a href="{% url 'project_detail' p.pk %}" class="project-card">
+        <div class="card-head">
+            <div class="card-name">{{ p.name }}</div>
+            <span class="status-badge status-{{ p.status }}">{{ p.status_label }}</span>
+        </div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span>機材 {{ p.total_count }} 点</span>
+            <span>{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% else %}―{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-msg">該当する案件がありません。</div>
+{% endif %}
+
+<div class="section-title">終了した案件（{{ finished_projects|length }}件）</div>
+{% if finished_projects %}
+<div class="project-grid">
+    {% for p in finished_projects %}
+    <a href="{% url 'project_detail' p.pk %}" class="project-card">
+        <div class="card-head">
+            <div class="card-name">{{ p.name }}</div>
+            <span class="status-badge status-finished">終了</span>
+        </div>
+        <div class="card-dates">{{ p.loan_date|date:"n/j (D)" }} 〜 {{ p.return_date|date:"n/j (D)" }}</div>
+        <div class="card-foot">
+            <span>機材 {{ p.total_count }} 点</span>
+            <span>{% if p.manager %}{{ p.manager.last_name }}{{ p.manager.first_name }}{% if not p.manager.last_name and not p.manager.first_name %}{{ p.manager.username }}{% endif %}{% else %}―{% endif %}</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-msg">終了した案件はありません。</div>
+{% endif %}
+{% endblock %}

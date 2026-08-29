@@ -1,0 +1,386 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}{{ title }} - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+    .form-panel { flex: 1 1 480px; max-width: 560px; }
+    .guide-panel {
+        flex: 0 1 380px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 18px 20px;
+    }
+    .guide-panel h2 { font-size: 15px; margin: 0 0 4px; }
+    .guide-panel .guide-desc { font-size: 12px; color: var(--text-muted); margin: 0 0 16px; }
+
+    .guide-step { margin-bottom: 16px; }
+    .guide-step.disabled { opacity: 0.4; pointer-events: none; }
+    .guide-step label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+    .guide-step select { width: 100%; }
+    .guide-step .step-no {
+        display: inline-block;
+        width: 18px; height: 18px;
+        line-height: 18px;
+        text-align: center;
+        border-radius: 50%;
+        background: var(--border);
+        color: var(--text);
+        font-size: 11px;
+        margin-right: 6px;
+    }
+
+    .mode-choice { display: flex; gap: 8px; }
+    .mode-choice button {
+        flex: 1;
+        background: transparent;
+        border: 1px solid var(--border-light);
+        color: var(--text);
+        font-weight: normal;
+        padding: 8px;
+    }
+    .mode-choice button.active { background: var(--accent); color: #06263a; border-color: var(--accent); font-weight: 600; }
+
+    .guide-result {
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+    .guide-result .code-preview {
+        font-family: "Consolas", monospace;
+        font-size: 22px;
+        letter-spacing: 0.06em;
+        color: var(--accent);
+        margin-bottom: 6px;
+    }
+    .guide-result .code-note { font-size: 12px; color: var(--text-muted); }
+    .guide-result .guide-error { font-size: 13px; color: #f87171; }
+
+    .btn-row { display: flex; align-items: center; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+    .btn-row button.sub { background: transparent; border: 1px solid var(--border-light); color: var(--text); }
+    .btn-row button.sub:hover { background: var(--border); }
+    .sub-actions { font-size: 13px; margin-left: auto; }
+    .sub-actions a { margin-right: 12px; }
+    .sub-actions .delete-link { color: #f87171; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav">
+    <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'equipment_list' %}{% endif %}">← 品目一覧へ戻る</a>
+</div>
+
+<h1>{{ title }}</h1>
+
+<div class="form-layout">
+    <div class="panel form-panel">
+        <form method="post" id="equipment-form">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ return_url }}">
+            <input type="hidden" name="action" id="form-action" value="save">
+
+            {% for field in form %}
+            <div class="field">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                <span class="helptext">{{ field.help_text|safe }}</span>
+                {% endif %}
+                {{ field.errors }}
+            </div>
+            {% endfor %}
+
+            <div class="btn-row">
+                <button type="submit" data-action="save">登録</button>
+                {% if not equipment %}
+                <button type="submit" class="sub" data-action="continue_same">同じ機材を続けて登録</button>
+                <button type="submit" class="sub" data-action="continue">続けて登録</button>
+                {% endif %}
+                {% if equipment %}
+                <span class="sub-actions">
+                    <a href="{% url 'equipment_history' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">更新履歴</a>
+                    <a href="{% url 'equipment_delete' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}" class="delete-link">削除</a>
+                </span>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if not equipment %}
+    <div class="guide-panel">
+        <h2>品目コードの生成</h2>
+        <p class="guide-desc">上から順に選ぶと、左のフォームに自動で入力されます。手入力する場合はこの欄を使わずに直接入力してください。</p>
+
+        <div class="guide-step" id="g-area">
+            <label><span class="step-no">1</span>領域</label>
+            <select id="guide-area">
+                <option value="">-- 選択 --</option>
+                {% for area in form.fields.area.queryset %}
+                <option value="{{ area.id }}" data-code="{{ area.code }}">{{ area.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="guide-step disabled" id="g-kind">
+            <label><span class="step-no">2</span>種別</label>
+            <select id="guide-kind">
+                <option value="">-- 選択 --</option>
+            </select>
+        </div>
+
+        <div class="guide-step disabled" id="g-mode">
+            <label><span class="step-no">3</span>新規か、既存の増設か</label>
+            <div class="mode-choice">
+                <button type="button" id="mode-new">新しい機種</button>
+                <button type="button" id="mode-existing">既存を増やす</button>
+            </div>
+        </div>
+
+        <div class="guide-step disabled" id="g-model" style="display: none;">
+            <label><span class="step-no">4</span>機種</label>
+            <select id="guide-model">
+                <option value="">-- 選択 --</option>
+            </select>
+        </div>
+
+        <div class="guide-result" id="guide-result" style="display: none;">
+            <div class="code-preview" id="code-preview"></div>
+            <div class="code-note" id="code-note"></div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 領域を選ぶと、種別のプルダウンがその領域のものだけになる
+    const allKinds = [
+        {% for kind in all_kinds %}
+        { id: "{{ kind.id }}", name: "{{ kind.name|escapejs }}", areaId: "{{ kind.area_id }}" },
+        {% endfor %}
+    ];
+
+    const areaSelect = document.querySelector('#id_area');
+    const kindSelect = document.querySelector('#id_kind');
+    const initialKindId = kindSelect.value;
+
+    function updateKindOptions(keepSelection) {
+        const selectedArea = areaSelect.value;
+        const currentKind = keepSelection ? initialKindId : "";
+
+        kindSelect.innerHTML = '<option value="">---------</option>';
+
+        allKinds.forEach(function (kind) {
+            if (!selectedArea || kind.areaId === selectedArea) {
+                const option = document.createElement("option");
+                option.value = kind.id;
+                option.textContent = kind.name;
+                if (kind.id === currentKind) {
+                    option.selected = true;
+                }
+                kindSelect.appendChild(option);
+            }
+        });
+    }
+
+    areaSelect.addEventListener("change", function () {
+        updateKindOptions(false);
+    });
+
+    updateKindOptions(true);
+</script>
+
+<script>
+    // 送信ボタンごとに action を切り替える
+    document.querySelectorAll('#equipment-form button[type="submit"]').forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            document.getElementById("form-action").value = btn.dataset.action || "save";
+        });
+    });
+</script>
+
+{% if not equipment %}
+<script>
+(function () {
+    const gArea = document.getElementById("guide-area");
+    const gKind = document.getElementById("guide-kind");
+    const gModel = document.getElementById("guide-model");
+    const stepKind = document.getElementById("g-kind");
+    const stepMode = document.getElementById("g-mode");
+    const stepModel = document.getElementById("g-model");
+    const btnNew = document.getElementById("mode-new");
+    const btnExisting = document.getElementById("mode-existing");
+    const result = document.getElementById("guide-result");
+    const preview = document.getElementById("code-preview");
+    const note = document.getElementById("code-note");
+
+    // 左フォームの入力欄
+    const fCode = document.querySelector("#id_management_code");
+    const fArea = document.querySelector("#id_area");
+    const fKind = document.querySelector("#id_kind");
+    const fModel = document.querySelector("#id_model_name");
+    const fName = document.querySelector("#id_name");
+    const fStorage = document.querySelector("#id_storage_location");
+
+    let mode = "";
+
+    function setEnabled(el, on) {
+        el.classList.toggle("disabled", !on);
+    }
+
+    function resetFrom(step) {
+        if (step <= 2) {
+            gKind.innerHTML = '<option value="">-- 選択 --</option>';
+            setEnabled(stepKind, false);
+        }
+        if (step <= 3) {
+            mode = "";
+            btnNew.classList.remove("active");
+            btnExisting.classList.remove("active");
+            setEnabled(stepMode, false);
+        }
+        if (step <= 4) {
+            gModel.innerHTML = '<option value="">-- 選択 --</option>';
+            stepModel.style.display = "none";
+            setEnabled(stepModel, false);
+        }
+        result.style.display = "none";
+    }
+
+    // --- 1. 領域 ---
+    gArea.addEventListener("change", function () {
+        resetFrom(2);
+        if (!gArea.value) return;
+
+        allKinds.forEach(function (kind) {
+            if (kind.areaId === gArea.value) {
+                const opt = document.createElement("option");
+                opt.value = kind.id;
+                opt.textContent = kind.name;
+                gKind.appendChild(opt);
+            }
+        });
+        setEnabled(stepKind, true);
+    });
+
+    // --- 2. 種別 ---
+    gKind.addEventListener("change", function () {
+        resetFrom(3);
+        if (!gKind.value) return;
+        setEnabled(stepMode, true);
+    });
+
+    // --- 3. 新規 or 既存 ---
+    btnNew.addEventListener("click", function () {
+        mode = "new";
+        btnNew.classList.add("active");
+        btnExisting.classList.remove("active");
+        stepModel.style.display = "none";
+        fetchCode();
+    });
+
+    btnExisting.addEventListener("click", function () {
+        mode = "existing";
+        btnExisting.classList.add("active");
+        btnNew.classList.remove("active");
+        result.style.display = "none";
+        loadModels();
+    });
+
+    // --- 4. 機種一覧を取得 ---
+    function loadModels() {
+        const params = new URLSearchParams({ area: gArea.value, kind: gKind.value });
+        fetch("{% url 'model_list_api' %}?" + params)
+            .then(r => r.json())
+            .then(function (data) {
+                gModel.innerHTML = '<option value="">-- 選択 --</option>';
+                if (!data.models || data.models.length === 0) {
+                    gModel.innerHTML = '<option value="">（この種別に登録済みの機種はありません）</option>';
+                }
+                (data.models || []).forEach(function (m) {
+                    const opt = document.createElement("option");
+                    opt.value = m.prefix;
+                    opt.textContent = m.label;
+                    gModel.appendChild(opt);
+                });
+                stepModel.style.display = "";
+                setEnabled(stepModel, true);
+            });
+    }
+
+    gModel.addEventListener("change", function () {
+        if (gModel.value) fetchCode();
+    });
+
+    // --- コードを取得してフォームに反映 ---
+    function fetchCode() {
+        const params = new URLSearchParams({
+            area: gArea.value,
+            kind: gKind.value,
+            mode: mode,
+            model: mode === "existing" ? gModel.value : "",
+        });
+
+        fetch("{% url 'next_code_api' %}?" + params)
+            .then(r => r.json().then(data => ({ ok: r.ok, data })))
+            .then(function (res) {
+                result.style.display = "";
+                if (!res.ok) {
+                    preview.textContent = "";
+                    note.innerHTML = '<span class="guide-error">' + (res.data.error || "エラーが発生しました。") + "</span>";
+                    return;
+                }
+
+                const d = res.data;
+                preview.textContent = d.code;
+                note.textContent = mode === "new"
+                    ? "新しい機種として採番しました。機種名と名称を入力してください。"
+                    : d.serial + " 台目として採番しました。内容を確認してください。";
+
+                // 左のフォームに反映
+                fCode.value = d.code;
+                fArea.value = gArea.value;
+                fArea.dispatchEvent(new Event("change"));
+                fKind.value = gKind.value;
+
+                if (mode === "existing") {
+                    fModel.value = d.model_name;
+                    fName.value = d.name;
+                    if (d.storage_location_id) fStorage.value = d.storage_location_id;
+                }
+            });
+    }
+
+    // --- URLパラメータからの復元（「同じ機材を続けて登録」用） ---
+    const preset = {
+        area: "{{ preset_area }}",
+        kind: "{{ preset_kind }}",
+        model: "{{ preset_model }}",
+    };
+
+    if (preset.area && preset.kind) {
+        gArea.value = preset.area;
+        gArea.dispatchEvent(new Event("change"));
+        gKind.value = preset.kind;
+        gKind.dispatchEvent(new Event("change"));
+
+        if (preset.model) {
+            btnExisting.click();
+            // 機種一覧の読み込みを待ってから選択する
+            const timer = setInterval(function () {
+                if (gModel.options.length > 1) {
+                    clearInterval(timer);
+                    gModel.value = preset.model;
+                    if (gModel.value) fetchCode();
+                }
+            }, 100);
+            setTimeout(() => clearInterval(timer), 5000);
+        }
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}

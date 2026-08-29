@@ -1,0 +1,41 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}機材の削除 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-table { max-width: 520px; margin-bottom: 24px; }
+    .detail-table th { width: 130px; }
+    .btn-row { display: flex; align-items: center; gap: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav">
+    <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'equipment_list' %}{% endif %}">← 品目一覧へ戻る</a>
+</div>
+
+<h1>機材の削除</h1>
+
+<div class="warning-box">
+    この機材を削除します。データは残るため、「削除済みを表示」から後で復元できます。
+</div>
+
+<table class="detail-table">
+    <tr><th>品目コード</th><td>{{ equipment.management_code }}</td></tr>
+    <tr><th>領域</th><td>{{ equipment.area.name }}</td></tr>
+    <tr><th>種別</th><td>{{ equipment.kind.name }}</td></tr>
+    <tr><th>機種</th><td>{{ equipment.model_name }}</td></tr>
+    <tr><th>名称</th><td>{{ equipment.name }}</td></tr>
+    <tr><th>保管場所</th><td>{{ equipment.storage_location.name|default:"" }}</td></tr>
+</table>
+
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ return_url }}">
+    <div class="btn-row">
+        <button type="submit" class="danger">削除する</button>
+        <a href="{% if return_url %}{{ return_url }}{% else %}{% url 'equipment_list' %}{% endif %}">キャンセル</a>
+    </div>
+</form>
+{% endblock %}

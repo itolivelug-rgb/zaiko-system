@@ -1,0 +1,490 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}品目一覧 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .controls input[type="text"] { width: 260px; }
+    .toolbar-sep { flex: 1; }
+    
+    th a { display: inline-block; }
+    td a { color: var(--accent); }
+
+    #settings-panel .hint { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+    #column-list { list-style: none; padding: 0; margin: 0 0 12px; }
+    #column-list li { padding: 4px 0; display: flex; align-items: center; gap: 8px; }
+    #column-list li label { min-width: 130px; font-weight: normal; margin: 0; color: var(--text); }
+    #column-list button { padding: 2px 10px; font-size: 13px; }
+    #column-list .required { color: var(--text-muted); font-size: 11px; min-width: 40px; }
+
+    .dropdown-menu { position: relative; }
+    .dropdown-list {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: calc(100% + 4px);
+        background: var(--bg-panel);
+        border: 1px solid var(--border-light);
+        border-radius: 6px;
+        list-style: none;
+        margin: 0;
+        padding: 4px;
+        min-width: 200px;
+        z-index: 10;
+        white-space: nowrap;
+    }
+    .dropdown-list.open { display: block; }
+    .dropdown-list li { margin: 0; }
+    .dropdown-list button,
+    .dropdown-list a {
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        color: var(--text);
+        font-weight: normal;
+        font-size: 14px;
+        padding: 8px 12px;
+        border-radius: 4px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+    .dropdown-list button:hover,
+    .dropdown-list a:hover { background: var(--border); text-decoration: none; }
+
+    .column-settings { margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px; position: relative; }
+    .column-settings .btn.secondary {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid var(--border-light);
+        padding: 7px 16px;
+        border-radius: 4px;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    .column-settings .btn.secondary:hover { background: var(--border); text-decoration: none; }
+    #settings-panel {
+        position: absolute;
+        margin-top: 44px;
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 14px 16px;
+        z-index: 5;
+    }
+
+    .loan-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .loan-instock  { background: rgba(148, 163, 184, 0.12); color: var(--text-muted); border: 1px solid var(--border-light); }
+    .loan-reserved { background: rgba(245, 166, 35, 0.15); color: #fbbf24; border: 1px solid var(--orange); }
+    .loan-onloan   { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+    .project-cell { font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'home' %}">← ホームへ戻る</a></div>
+
+<h1>品目一覧{% if show_deleted %}（削除済み）{% endif %}</h1>
+
+{% if show_deleted %}
+<div class="toolbar">
+    <a href="{% url 'equipment_list' %}">← 通常の一覧に戻る</a>
+</div>
+<div class="deleted-notice">
+    削除済みの機材を表示しています。「復元」で通常の一覧に戻せます。
+</div>
+{% endif %}
+
+{% if not show_deleted %}
+<div class="toolbar">
+    <span class="toolbar-sep"></span>
+
+    <div class="dropdown-menu">
+        <button type="button" id="manage-toggle" class="secondary">管理 ▾</button>
+        <ul id="manage-list" class="dropdown-list">
+            <li><a href="{% url 'equipment_create' %}?next={{ current_url|urlencode }}">新規機材を登録</a></li>
+            <li><a href="{% url 'history_list' %}">更新履歴</a></li>
+        </ul>
+    </div>
+
+    <div class="dropdown-menu">
+        <button type="button" id="export-toggle" class="secondary">出力 ▾</button>
+        <ul id="export-list" class="dropdown-list">
+            <li><button type="button" data-export="print">印刷</button></li>
+            <li><button type="button" data-export="csv">CSV出力</button></li>
+            {% if user.is_staff %}
+            <li><button type="button" data-export="label">ラベル用CSV（テプラ）</button></li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+<form method="get" class="controls">
+    {% if show_deleted %}<input type="hidden" name="deleted" value="1">{% endif %}
+    <input type="text" name="q" value="{{ keyword }}" placeholder="品目コード / 機種 / 名称">
+
+    <select name="area">
+        <option value="">-- 領域 --</option>
+        {% for area in areas %}
+        <option value="{{ area.id }}" {% if selected_area == area.id|stringformat:"s" %}selected{% endif %}>{{ area.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="kind">
+        <option value="">-- 種別 --</option>
+    </select>
+
+    <select name="storage">
+        <option value="">-- 保管場所 --</option>
+        {% for storage in storages %}
+        <option value="{{ storage.id }}" {% if selected_storage == storage.id|stringformat:"s" %}selected{% endif %}>{{ storage.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="loan">
+        <option value="">-- 貸出状況 --</option>
+        <option value="instock"  {% if selected_loan == "instock" %}selected{% endif %}>予約なし</option>
+        <option value="reserved" {% if selected_loan == "reserved" %}selected{% endif %}>準備中</option>
+        <option value="onloan"   {% if selected_loan == "onloan" %}selected{% endif %}>貸出中</option>
+    </select>
+
+    <select name="project">
+        <option value="">-- 案件 --</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if selected_project == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">検索</button>
+    <a href="{% url 'equipment_list' %}{% if show_deleted %}?deleted=1{% endif %}">クリア</a>
+</form>
+
+<div class="column-settings">
+    <button type="button" id="toggle-settings" class="secondary">表示設定</button>
+    <a href="{% url 'equipment_gantt' %}?{{ pager_params }}" class="btn secondary">ガントチャート</a>
+    <div id="settings-panel" style="display: none;">
+        <p class="hint">チェックを外すと非表示になります。↑↓で並び順を変更できます。</p>
+        <ul id="column-list"></ul>
+        <button type="button" id="reset-columns" class="secondary">初期状態に戻す</button>
+    </div>
+</div>
+
+<div class="count">{{ page_obj.end_index }} / {{ total_count }} 件</div>
+{% include "equipment/_pagination.html" %}
+
+<table>
+    <thead>
+        <tr>
+            <th data-col="management_code"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=management_code&dir={% if sort == 'management_code' and direction == 'asc' %}desc{% else %}asc{% endif %}">品目コード{% if sort == 'management_code' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="area"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=area__name&dir={% if sort == 'area__name' and direction == 'asc' %}desc{% else %}asc{% endif %}">領域{% if sort == 'area__name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="kind"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=kind__name&dir={% if sort == 'kind__name' and direction == 'asc' %}desc{% else %}asc{% endif %}">種別{% if sort == 'kind__name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="model_name"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=model_name&dir={% if sort == 'model_name' and direction == 'asc' %}desc{% else %}asc{% endif %}">機種{% if sort == 'model_name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="name"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=name&dir={% if sort == 'name' and direction == 'asc' %}desc{% else %}asc{% endif %}">名称{% if sort == 'name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="storage"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=storage_location__name&dir={% if sort == 'storage_location__name' and direction == 'asc' %}desc{% else %}asc{% endif %}">保管場所{% if sort == 'storage_location__name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
+            <th data-col="loan_status">貸出状況</th>
+            <th data-col="project">登録案件</th>
+            {% if show_deleted %}<th>操作</th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td data-col="management_code"><a href="{% url 'equipment_update' row.equipment.pk %}?next={{ current_url|urlencode }}">{{ row.equipment.management_code }}</a></td>
+            <td data-col="area">{{ row.equipment.area.name }}</td>
+            <td data-col="kind">{{ row.equipment.kind.name }}</td>
+            <td data-col="model_name">{{ row.equipment.model_name }}</td>
+            <td data-col="name">{{ row.equipment.name }}</td>
+            <td data-col="storage">{{ row.equipment.storage_location.name|default:"" }}</td>
+            <td data-col="loan_status"><span class="loan-badge loan-{{ row.loan_status_key }}">{{ row.loan_status }}</span></td>
+            <td data-col="project" class="project-cell">{{ row.project_names }}</td>
+            {% if show_deleted %}
+            <td>
+                <form method="post" action="{% url 'equipment_restore' row.equipment.pk %}" style="display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ current_url }}">
+                    <button type="submit" class="secondary">復元</button>
+                </form>
+            </td>
+            {% endif %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-muted">該当するデータがありません。</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% include "equipment/_pagination.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 領域を選ぶと、種別のプルダウンがその領域のものだけになる
+    const allKinds = [
+        {% for kind in all_kinds %}
+        { id: "{{ kind.id }}", name: "{{ kind.name|escapejs }}", areaId: "{{ kind.area_id }}" },
+        {% endfor %}
+    ];
+
+    const selectedKindId = "{{ selected_kind }}";
+    const areaSelect = document.querySelector('select[name="area"]');
+    const kindSelect = document.querySelector('select[name="kind"]');
+
+    function updateKindOptions(keepSelection) {
+        const selectedArea = areaSelect.value;
+        const currentKind = keepSelection ? selectedKindId : "";
+
+        kindSelect.innerHTML = '<option value="">-- 種別 --</option>';
+
+        allKinds.forEach(function (kind) {
+            if (!selectedArea || kind.areaId === selectedArea) {
+                const option = document.createElement("option");
+                option.value = kind.id;
+                option.textContent = kind.name;
+                if (kind.id === currentKind) {
+                    option.selected = true;
+                }
+                kindSelect.appendChild(option);
+            }
+        });
+    }
+
+    areaSelect.addEventListener("change", function () {
+        updateKindOptions(false);
+    });
+
+    updateKindOptions(true);
+</script>
+
+<script>
+(function () {
+    const STORAGE_KEY = "equipmentListColumns";
+
+    const DEFAULT_COLUMNS = [
+        { key: "management_code", label: "品目コード", required: true,  visible: true },
+        { key: "area",            label: "領域",       required: false, visible: true },
+        { key: "kind",            label: "種別",       required: false, visible: true },
+        { key: "model_name",      label: "機種",       required: true,  visible: true },
+        { key: "name",            label: "名称",       required: false, visible: true },
+        { key: "storage",         label: "保管場所",   required: false, visible: true },
+        { key: "loan_status",     label: "貸出状況",   required: false, visible: true },
+        { key: "project",         label: "登録案件",   required: false, visible: true },
+    ];
+
+    let columns = loadColumns();
+
+    function loadColumns() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return structuredClone(DEFAULT_COLUMNS);
+
+            const parsed = JSON.parse(saved);
+            const result = [];
+            parsed.forEach(function (item) {
+                const def = DEFAULT_COLUMNS.find(c => c.key === item.key);
+                if (def) {
+                    result.push({
+                        key: def.key,
+                        label: def.label,
+                        required: def.required,
+                        visible: def.required ? true : !!item.visible,
+                    });
+                }
+            });
+            DEFAULT_COLUMNS.forEach(function (def) {
+                if (!result.find(c => c.key === def.key)) {
+                    result.push(structuredClone(def));
+                }
+            });
+            return result;
+        } catch (e) {
+            return structuredClone(DEFAULT_COLUMNS);
+        }
+    }
+
+    function saveColumns() {
+        const data = columns.map(c => ({ key: c.key, visible: c.visible }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function applyColumns() {
+        const table = document.querySelector("table");
+        if (!table) return;
+
+        table.querySelectorAll("tr").forEach(function (tr) {
+            const cells = Array.from(tr.children).filter(el => el.dataset.col);
+            if (cells.length === 0) return;
+
+            columns.forEach(function (col) {
+                const cell = cells.find(c => c.dataset.col === col.key);
+                if (cell) {
+                    tr.insertBefore(cell, tr.lastElementChild.dataset.col ? null : tr.lastElementChild);
+                    cell.style.display = col.visible ? "" : "none";
+                }
+            });
+        });
+    }
+
+    function renderPanel() {
+        const list = document.getElementById("column-list");
+        list.innerHTML = "";
+
+        columns.forEach(function (col, index) {
+            const li = document.createElement("li");
+
+            const label = document.createElement("label");
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = col.visible;
+            checkbox.disabled = col.required;
+            checkbox.addEventListener("change", function () {
+                col.visible = checkbox.checked;
+                saveColumns();
+                applyColumns();
+            });
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(" " + col.label));
+            li.appendChild(label);
+
+            const note = document.createElement("span");
+            note.className = "required";
+            note.textContent = col.required ? "(必須)" : "";
+            li.appendChild(note);
+
+            const upBtn = document.createElement("button");
+            upBtn.type = "button";
+            upBtn.className = "secondary";
+            upBtn.textContent = "↑";
+            upBtn.disabled = index === 0;
+            upBtn.addEventListener("click", function () {
+                [columns[index - 1], columns[index]] = [columns[index], columns[index - 1]];
+                saveColumns();
+                renderPanel();
+                applyColumns();
+            });
+            li.appendChild(upBtn);
+
+            const downBtn = document.createElement("button");
+            downBtn.type = "button";
+            downBtn.className = "secondary";
+            downBtn.textContent = "↓";
+            downBtn.disabled = index === columns.length - 1;
+            downBtn.addEventListener("click", function () {
+                [columns[index + 1], columns[index]] = [columns[index], columns[index + 1]];
+                saveColumns();
+                renderPanel();
+                applyColumns();
+            });
+            li.appendChild(downBtn);
+
+            list.appendChild(li);
+        });
+    }
+
+    document.getElementById("toggle-settings").addEventListener("click", function () {
+        const panel = document.getElementById("settings-panel");
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+    });
+
+    document.getElementById("reset-columns").addEventListener("click", function () {
+        columns = structuredClone(DEFAULT_COLUMNS);
+        localStorage.removeItem(STORAGE_KEY);
+        renderPanel();
+        applyColumns();
+    });
+
+    // --- 出力メニュー ---
+    const totalCount = {{ total_count }};
+
+    const EXPORT_CONFIG = {
+        print: { url: "{% url 'equipment_print' %}", label: "印刷", useCols: true,  newTab: true },
+        csv:   { url: "{% url 'equipment_csv' %}",   label: "CSV出力", useCols: true,  newTab: false },
+        {% if user.is_staff %}
+        label: { url: "{% url 'equipment_label_csv' %}", label: "ラベル用CSV", useCols: false, newTab: false },
+        {% endif %}
+    };
+
+    function buildExportUrl(config) {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("page");
+        params.delete("cols");
+        if (config.useCols) {
+            const visibleKeys = columns.filter(c => c.visible).map(c => c.key);
+            params.set("cols", visibleKeys.join(","));
+        }
+        return config.url + "?" + params.toString();
+    }
+
+    const exportToggle = document.getElementById("export-toggle");
+    const exportList = document.getElementById("export-list");
+    const manageToggle = document.getElementById("manage-toggle");
+    const manageList = document.getElementById("manage-list");
+
+    function closeAllMenus() {
+        if (exportList) exportList.classList.remove("open");
+        if (manageList) manageList.classList.remove("open");
+    }
+
+    if (exportToggle) {
+        exportToggle.addEventListener("click", function (e) {
+            e.stopPropagation();
+            const wasOpen = exportList.classList.contains("open");
+            closeAllMenus();
+            if (!wasOpen) exportList.classList.add("open");
+        });
+        exportList.addEventListener("click", function (e) { e.stopPropagation(); });
+    }
+
+    if (manageToggle) {
+        manageToggle.addEventListener("click", function (e) {
+            e.stopPropagation();
+            const wasOpen = manageList.classList.contains("open");
+            closeAllMenus();
+            if (!wasOpen) manageList.classList.add("open");
+        });
+        manageList.addEventListener("click", function (e) { e.stopPropagation(); });
+    }
+
+    document.addEventListener("click", closeAllMenus);
+
+    exportList.querySelectorAll("button[data-export]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            const key = btn.dataset.export;
+            const config = EXPORT_CONFIG[key];
+            if (!config) return;
+
+            closeAllMenus();
+
+            if (totalCount === 0) {
+                alert("対象のデータがありません。");
+                return;
+            }
+
+            if (!confirm(config.label + "を実行します。\n\n対象: " + totalCount + " 件\n\nよろしいですか？")) {
+                return;
+            }
+
+            const url = buildExportUrl(config);
+            if (config.newTab) {
+                window.open(url, "_blank");
+            } else {
+                window.location.href = url;
+            }
+        });
+    });
+
+    renderPanel();
+    applyColumns();
+})();
+</script>
+{% endblock %}

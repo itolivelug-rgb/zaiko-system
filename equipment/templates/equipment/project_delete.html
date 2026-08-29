@@ -1,0 +1,36 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}案件の削除 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-table { max-width: 520px; margin-bottom: 24px; }
+    .detail-table th { width: 130px; }
+    .btn-row { display: flex; align-items: center; gap: 16px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'project_detail' project.pk %}">← 案件詳細へ戻る</a></div>
+
+<h1>案件の削除</h1>
+
+<div class="warning-box">
+    この案件を削除します。データは残るため後で復元できますが、<strong>予約されていた機材 {{ project.total_count }} 点は解放され、他の案件で使用できるようになります。</strong>
+</div>
+
+<table class="detail-table">
+    <tr><th>案件名</th><td>{{ project.name }}</td></tr>
+    <tr><th>貸出日</th><td>{{ project.loan_date|date:"Y/n/j (D)" }}</td></tr>
+    <tr><th>返却予定日</th><td>{{ project.return_date|date:"Y/n/j (D)" }}</td></tr>
+    <tr><th>機材</th><td>{{ project.total_count }} 点</td></tr>
+</table>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="btn-row">
+        <button type="submit" class="danger">削除する</button>
+        <a href="{% url 'project_detail' project.pk %}">キャンセル</a>
+    </div>
+</form>
+{% endblock %}

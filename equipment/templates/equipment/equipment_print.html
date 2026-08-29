@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ page_title }} 印刷</title>
+{% load static %}<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ page_title }} 印刷</title>
+    <link rel="stylesheet" href="{% static 'equipment/css/print.css' %}">
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">印刷する</button>
+        <button onclick="window.close()">閉じる</button>
+        <div class="hint">用紙サイズは A3 横 を想定しています。印刷ダイアログで変更できます。</div>
+    </div>
+
+    <h1>{{ page_title }}</h1>
+    <div class="meta">
+        <span>条件: {{ condition_text }}</span>
+        <span>件数: {{ total_count }} 件</span>
+        <span>出力日時: {{ printed_at|date:"Y-m-d H:i" }}</span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                {% for header in headers %}
+                <th>{{ header }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in rows %}
+                {% if row.type == "tab" %}
+                <tr class="area-tab">
+                    <td colspan="{{ col_count }}">{{ row.label }}</td>
+                </tr>
+                {% else %}
+                <tr class="data-row{% if row.odd %} stripe{% endif %}">
+                    {% for cell in row.cells %}
+                    <td class="col-{{ cell.key }}">{{ cell.value }}</td>
+                    {% endfor %}
+                </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+        window.addEventListener("load", function () {
+            window.print();
+        });
+    </script>
+</body>
+</html>

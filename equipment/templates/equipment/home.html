@@ -1,0 +1,103 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}ホーム - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .section-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin: 28px 0 12px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid var(--border);
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 14px;
+    }
+    .menu-card {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 20px;
+        text-decoration: none;
+        color: var(--text);
+        display: block;
+        transition: border-color 0.15s, transform 0.15s;
+    }
+    .menu-card:hover {
+        border-color: var(--accent);
+        text-decoration: none;
+        color: var(--text);
+        transform: translateY(-2px);
+    }
+    .menu-card .card-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .menu-card .card-desc { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+    .menu-card .card-bar { height: 4px; border-radius: 2px; margin-bottom: 14px; width: 36px; }
+
+    .bar-orange { background: var(--orange); }
+    .bar-red { background: var(--red); }
+    .bar-green { background: var(--green); }
+    .bar-blue { background: var(--accent); }
+    .bar-gray { background: var(--border-light); }
+
+    .menu-card.disabled { opacity: 0.45; pointer-events: none; }
+    .menu-card.disabled .card-desc::after { content: "（準備中）"; color: var(--orange); }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>メニュー</h1>
+
+<div class="menu-grid">
+    <a href="{% url 'equipment_list' %}" class="menu-card">
+        <div class="card-bar bar-orange"></div>
+        <div class="card-title">品目一覧</div>
+        <div class="card-desc">機材の検索・閲覧・登録・編集を行います。</div>
+    </a>
+
+    <a href="{% url 'project_list' %}" class="menu-card">
+        <div class="card-bar bar-red"></div>
+        <div class="card-title">案件管理</div>
+        <div class="card-desc">案件の登録と使用機材の割り当てを行います。</div>
+    </a>
+</div>
+
+<div class="section-title">貸出・返却</div>
+
+<div class="menu-grid">
+    <a href="{% url 'loan_project_list' %}" class="menu-card">
+        <div class="card-bar bar-orange"></div>
+        <div class="card-title">貸出</div>
+        <div class="card-desc">案件を選び、QRスキャンで出庫処理を行います。</div>
+    </a>
+
+    <a href="{% url 'return_project_list' %}" class="menu-card">
+        <div class="card-bar bar-green"></div>
+        <div class="card-title">返却</div>
+        <div class="card-desc">案件を選び、QRスキャンで返却処理を行います。</div>
+    </a>
+</div>
+
+<div class="section-title">管理</div>
+
+<div class="menu-grid">
+    <a href="{% url 'history_list' %}" class="menu-card">
+        <div class="card-bar bar-gray"></div>
+        <div class="card-title">更新履歴</div>
+        <div class="card-desc">機材の追加・変更・削除の記録を確認します。</div>
+    </a>
+
+    {% if user.is_staff %}
+    <a href="{% url 'user_list' %}" class="menu-card">
+        <div class="card-bar bar-gray"></div>
+        <div class="card-title">ユーザー管理</div>
+        <div class="card-desc">アカウントの追加・編集を行います。</div>
+    </a>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}ガントチャート - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .range-bar {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        font-size: 13px;
+    }
+    .range-bar .label { color: var(--text-muted); }
+    .range-bar .spacer { flex: 1; }
+
+    .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .controls input[type="text"] { width: 220px; }
+
+    .gantt-left { flex: 0 0 340px; }
+    .col-code  { width: 106px; flex: 0 0 106px; padding: 0 8px; }
+    .col-code a { color: var(--accent); }
+    .col-area  { width: 66px; flex: 0 0 66px; }
+    .day-cell { min-width: 22px; }
+    .day-cell.is-today { background: rgba(56, 189, 248, 0.12); }
+    .day-cell.is-today .d1, .day-cell.is-today .d2 { color: var(--accent); }
+
+    .empty-msg { padding: 30px 0; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav"><a href="{% url 'equipment_list' %}?{{ pager_params }}">← 品目一覧へ戻る</a></div>
+
+<h1>ガントチャート</h1>
+
+<form method="get" id="range-form">
+    <input type="hidden" name="q" value="{{ keyword }}">
+    <input type="hidden" name="area" value="{{ selected_area }}">
+    <input type="hidden" name="kind" value="{{ selected_kind }}">
+    <input type="hidden" name="storage" value="{{ selected_storage }}">
+    <input type="hidden" name="loan" value="{{ selected_loan }}">
+    <input type="hidden" name="project" value="{{ selected_project }}">
+    <div class="range-bar">
+        <span class="label">表示期間</span>
+        <input type="date" name="from" value="{{ range_start|date:'Y-m-d' }}">
+        <span class="label">〜</span>
+        <input type="date" name="to" value="{{ range_end|date:'Y-m-d' }}">
+        <button type="submit" class="secondary">変更</button>
+        <span class="spacer"></span>
+        <span class="label">{{ page_obj.end_index }} / {{ total_count }} 件</span>
+    </div>
+</form>
+
+<form method="get" class="controls">
+    <input type="hidden" name="from" value="{{ range_start|date:'Y-m-d' }}">
+    <input type="hidden" name="to" value="{{ range_end|date:'Y-m-d' }}">
+    <input type="text" name="q" value="{{ keyword }}" placeholder="品目コード / 機種 / 名称">
+
+    <select name="area">
+        <option value="">-- 領域 --</option>
+        {% for area in areas %}
+        <option value="{{ area.id }}" {% if selected_area == area.id|stringformat:"s" %}selected{% endif %}>{{ area.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="kind">
+        <option value="">-- 種別 --</option>
+    </select>
+
+    <select name="storage">
+        <option value="">-- 保管場所 --</option>
+        {% for storage in storages %}
+        <option value="{{ storage.id }}" {% if selected_storage == storage.id|stringformat:"s" %}selected{% endif %}>{{ storage.name }}</option>
+        {% endfor %}
+    </select>
+
+    <select name="loan">
+        <option value="">-- 貸出状況 --</option>
+        <option value="instock"  {% if selected_loan == "instock" %}selected{% endif %}>予約なし</option>
+        <option value="reserved" {% if selected_loan == "reserved" %}selected{% endif %}>準備中</option>
+        <option value="onloan"   {% if selected_loan == "onloan" %}selected{% endif %}>貸出中</option>
+    </select>
+
+    <select name="project">
+        <option value="">-- 案件 --</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if selected_project == p.id|stringformat:"s" %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>
+
+    <button type="submit">検索</button>
+    <a href="{% url 'equipment_gantt' %}">クリア</a>
+</form>
+
+<div class="legend">
+    <span><i class="swatch sw-preparing"></i>準備中</span>
+    <span><i class="swatch sw-on_loan"></i>貸出中</span>
+    <span><i class="swatch sw-finished"></i>終了</span>
+</div>
+
+{% include "equipment/_pagination.html" %}
+
+{% if rows %}
+<div class="gantt">
+    <div class="gantt-left">
+        <div class="g-head">
+            <span class="col-code">品目コード</span>
+            <span class="col-area">領域</span>
+            <span class="col-model">機種</span>
+        </div>
+        {% for row in rows %}
+        <div class="g-row">
+            <span class="col-code"><a href="{% url 'equipment_update' row.equipment.pk %}?next={{ current_url|urlencode }}">{{ row.equipment.management_code }}</a></span>
+            <span class="col-area">{{ row.equipment.area.name }}</span>
+            <span class="col-model" title="{{ row.equipment.model_name }}">{{ row.equipment.model_name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="gantt-right">
+        <div style="min-width: {{ gantt_min_width }}px;">
+            <div class="day-head">
+                {% for day in days %}
+                <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.is_today %} is-today{% endif %}">
+                    <div class="d1">{{ day.date|date:"n/j" }}</div>
+                    <div class="d2">{{ day.date|date:"D" }}</div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% for row in rows %}
+            <div class="g-track">
+                {% for bar in row.bars %}
+                <div class="bar bar-{{ bar.state }}" style="left: {{ bar.left }}%; width: {{ bar.width }}%;"
+                     title="{{ bar.name }}（{{ bar.state_label }}）">{{ bar.name }}</div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="empty-msg">該当するデータがありません。</div>
+{% endif %}
+
+{% include "equipment/_pagination.html" %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const allKinds = [
+        {% for kind in all_kinds %}
+        { id: "{{ kind.id }}", name: "{{ kind.name|escapejs }}", areaId: "{{ kind.area_id }}" },
+        {% endfor %}
+    ];
+    const selectedKindId = "{{ selected_kind }}";
+    const areaSelect = document.querySelector('.controls select[name="area"]');
+    const kindSelect = document.querySelector('.controls select[name="kind"]');
+
+    function updateKindOptions(keepSelection) {
+        const selectedArea = areaSelect.value;
+        const currentKind = keepSelection ? selectedKindId : "";
+        kindSelect.innerHTML = '<option value="">-- 種別 --</option>';
+        allKinds.forEach(function (kind) {
+            if (!selectedArea || kind.areaId === selectedArea) {
+                const option = document.createElement("option");
+                option.value = kind.id;
+                option.textContent = kind.name;
+                if (kind.id === currentKind) option.selected = true;
+                kindSelect.appendChild(option);
+            }
+        });
+    }
+    areaSelect.addEventListener("change", function () { updateKindOptions(false); });
+    updateKindOptions(true);
+</script>
+{% endblock %}
