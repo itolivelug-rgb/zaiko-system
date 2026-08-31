@@ -1042,6 +1042,7 @@ def project_print(request, pk):
         "total_count": data_count,
         "manager_name": manager_name,
         "printed_at": timezone.localtime(),
+        "notes": project.notes,
     })
     
 @login_required

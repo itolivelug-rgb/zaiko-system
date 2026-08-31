@@ -6,6 +6,12 @@
     <link rel="stylesheet" href="{% static 'equipment/css/print.css' %}">
     <style>
         td.transfer { font-size: 8pt; color: #8a5a00; }
+        .meta .notes {
+            white-space: pre-wrap;
+            max-width: 40%;
+            display: inline-block;
+            vertical-align: top;
+        }
     </style>
 </head>
 <body>
@@ -24,6 +30,7 @@
         <span>担当者: {{ manager_name }}</span>
         <span>件数: {{ total_count }} 件</span>
         <span>出力日時: {{ printed_at|date:"Y-m-d H:i" }}</span>
+        {% if project.notes %}<span class="notes">備考: {{ project.notes }}</span>{% endif %}
     </div>
 
     <table>
