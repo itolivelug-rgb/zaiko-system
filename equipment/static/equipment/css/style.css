@@ -455,6 +455,10 @@ html[data-theme="light"] tbody tr:hover { background: #eef4fa; }
 
 html[data-theme="light"] button, html[data-theme="light"] .btn { color: #ffffff; }
 html[data-theme="light"] button:hover, html[data-theme="light"] .btn:hover { color: #ffffff; }
+html[data-theme="light"] .dropdown-list button { color: var(--text); }
+html[data-theme="light"] .dropdown-list button:hover { color: var(--text); }
+html[data-theme="light"] .guide-panel .mode-choice button { color: #1a2333; }
+html[data-theme="light"] .guide-panel .mode-choice button.active { color: #ffffff; }
 html[data-theme="light"] button.secondary { color: var(--text); }
 html[data-theme="light"] button.link-style { color: var(--accent); }
 
