@@ -402,6 +402,18 @@ tbody tr:last-child td { border-bottom: none; }
 .sw-on_loan   { background: #38bdf8; }
 .sw-finished  { background: #4ade80; }
 
+/* 日付ごとの縦線（1日あたりの幅を CSS 変数で受け取る） */
+.g-track {
+    background-image: repeating-linear-gradient(
+        to right,
+        var(--border) 0,
+        var(--border) 1px,
+        transparent 1px,
+        transparent var(--day-width, 34px)
+    );
+    background-position: left top;
+}
+
 /* 日付入力（ダークテーマ用） */
 input[type="date"] {
     background: var(--bg-input);

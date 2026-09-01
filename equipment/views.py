@@ -875,6 +875,7 @@ def project_add_equipment(request, pk):
     # 1日あたりの最小幅を決める（デフォルト期間がちょうど収まる幅を基準にする）
     default_days = (project.return_date - project.loan_date).days + 15  # 前後7日ずつ
     gantt_min_width = max(700, int(total_days / default_days * 700))
+    day_width = gantt_min_width / total_days    
     
     today = timezone.localdate()
 
@@ -979,7 +980,8 @@ def project_add_equipment(request, pk):
         "gantt_min_width": gantt_min_width,
         "selected_loan": cond["loan_status"],
         "selected_project": cond["project_id"],
-        "projects": [p for p in Project.objects.filter(is_deleted=False).order_by("loan_date") if p.status != "finished"],            
+        "projects": [p for p in Project.objects.filter(is_deleted=False).order_by("loan_date") if p.status != "finished"],      
+        "day_width": round(day_width, 4),
     })
 
 @login_required
@@ -1116,6 +1118,7 @@ def equipment_gantt(request):
         })
     # 1日あたりの幅を保つ（28日分がちょうど収まる幅を基準にする）
     gantt_min_width = max(700, int(total_days / 28 * 700))
+    day_width = gantt_min_width / total_days
 
     pager_params = urlencode({
         "q": cond["keyword"],
@@ -1151,6 +1154,7 @@ def equipment_gantt(request):
         "projects": [p for p in Project.objects.filter(is_deleted=False).order_by("loan_date") if p.status != "finished"],
         "pager_params": pager_params,
         "current_url": request.get_full_path(),
+        "day_width": round(day_width, 4),
     })
     
 @login_required

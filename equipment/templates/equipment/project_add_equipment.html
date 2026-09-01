@@ -167,7 +167,7 @@
         </div>
 
         <div class="gantt-right">
-            <div class="gantt-right-inner" style="min-width: {{ gantt_min_width }}px;">
+        <div style="min-width: {{ gantt_min_width }}px; --day-width: {{ day_width }}px;">
                 <div class="day-head">
                     {% for day in days %}
                     <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.in_project %} in-project{% endif %}{% if day.is_start %} p-start{% endif %}{% if day.is_end %} p-end{% endif %}">

@@ -124,7 +124,7 @@
     </div>
 
     <div class="gantt-right">
-        <div style="min-width: {{ gantt_min_width }}px;">
+        <div style="min-width: {{ gantt_min_width }}px; --day-width: {{ day_width }}px;">
             <div class="day-head">
                 {% for day in days %}
                 <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.is_today %} is-today{% endif %}">
