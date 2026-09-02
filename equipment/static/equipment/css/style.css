@@ -378,7 +378,7 @@ tbody tr:last-child td { border-bottom: none; }
 .col-model { flex: 1; padding: 0 6px; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .day-head { display: flex; height: 44px; background: var(--bg-header); }
-.day-cell { flex: 1; text-align: center; font-size: 10px; padding-top: 4px; border-left: 1px solid var(--border); }
+.day-cell { flex: 1; text-align: center; font-size: 10px; padding-top: 4px; }
 .day-cell .d1 { color: var(--text-muted); }
 .day-cell .d2 { color: #64748b; }
 .day-cell.weekend .d1, .day-cell.weekend .d2 { color: #f87171; }
@@ -402,17 +402,6 @@ tbody tr:last-child td { border-bottom: none; }
 .sw-on_loan   { background: #38bdf8; }
 .sw-finished  { background: #4ade80; }
 
-/* 日付ごとの縦線（1日あたりの幅を CSS 変数で受け取る） */
-.g-track {
-    background-image: repeating-linear-gradient(
-        to right,
-        var(--border) 0,
-        var(--border) 1px,
-        transparent 1px,
-        transparent var(--day-width, 34px)
-    );
-    background-position: left top;
-}
 
 /* 日付入力（ダークテーマ用） */
 input[type="date"] {

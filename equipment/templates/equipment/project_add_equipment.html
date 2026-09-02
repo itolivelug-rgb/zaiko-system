@@ -39,8 +39,8 @@
 
     .day-cell { min-width: 34px; }
     .day-cell.in-project { background: rgba(56, 189, 248, 0.06); }
-    .day-cell.p-start { border-left: 2px solid var(--accent); }
-    .day-cell.p-end { border-right: 2px solid var(--accent); }
+    .day-cell.p-start { box-shadow: inset 2px 0 0 var(--accent); margin-left: -1px; }
+    .day-cell.p-end { box-shadow: inset -2px 0 0 var(--accent); }
     .day-cell.in-project .d1, .day-cell.in-project .d2 { color: var(--accent); }
     .day-cell.in-project.weekend .d1, .day-cell.in-project.weekend .d2 { color: #f87171; }
 
@@ -167,7 +167,7 @@
         </div>
 
         <div class="gantt-right">
-        <div style="min-width: {{ gantt_min_width }}px; --day-width: {{ day_width }}px;">
+        <div style="min-width: {{ gantt_min_width }}px;">
                 <div class="day-head">
                     {% for day in days %}
                     <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.in_project %} in-project{% endif %}{% if day.is_start %} p-start{% endif %}{% if day.is_end %} p-end{% endif %}">
@@ -292,5 +292,47 @@
             }
         });
     });
+</script>
+
+<script>
+    function syncDayGrid() {
+        const cells = document.querySelectorAll(".day-cell");
+        if (cells.length < 2) return;
+
+        const a = cells[0].getBoundingClientRect().left;
+        const b = cells[1].getBoundingClientRect().left;
+        const w = b - a;
+        if (w <= 0) return;
+
+        // --- 日付ごとの縦線 ---
+        const gradient =
+            "repeating-linear-gradient(to right," +
+            "transparent 0," +
+            "transparent " + (w - 1) + "px," +
+            "var(--border) " + (w - 1) + "px," +
+            "var(--border) " + w + "px)";
+
+        document.querySelectorAll(".day-head, .g-track").forEach(function (el) {
+            el.style.backgroundImage = gradient;
+        });
+
+        // --- 案件期間の枠 ---
+        const startCell = document.querySelector(".day-cell.p-start");
+        const endCell = document.querySelector(".day-cell.p-end");
+        if (!startCell || !endCell) return;
+
+        const origin = cells[0].getBoundingClientRect().left;
+        const left = startCell.getBoundingClientRect().left - origin;
+        const right = endCell.getBoundingClientRect().right - origin;
+
+        document.querySelectorAll(".project-span, .bar-self").forEach(function (el) {
+            el.style.left = (left) + "px";
+            el.style.width = (right - left) + "px";
+        });
+    }
+
+    syncDayGrid();
+    window.addEventListener("load", syncDayGrid);
+    window.addEventListener("resize", syncDayGrid);
 </script>
 {% endblock %}

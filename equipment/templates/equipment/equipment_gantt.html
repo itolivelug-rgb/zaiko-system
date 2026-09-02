@@ -124,7 +124,7 @@
     </div>
 
     <div class="gantt-right">
-        <div style="min-width: {{ gantt_min_width }}px; --day-width: {{ day_width }}px;">
+        <div style="min-width: {{ gantt_min_width }}px;">
             <div class="day-head">
                 {% for day in days %}
                 <div class="day-cell{% if day.weekend %} weekend{% endif %}{% if day.is_today %} is-today{% endif %}">
@@ -179,5 +179,33 @@
     }
     areaSelect.addEventListener("change", function () { updateKindOptions(false); });
     updateKindOptions(true);
+</script>
+
+<script>
+    // 実際に描画された1日分の幅を測り、縦線を引く
+    function syncDayGrid() {
+        const cells = document.querySelectorAll(".day-cell");
+        if (cells.length < 2) return;
+
+        // 隣り合うセルの左端の差＝1日分の実幅
+        const a = cells[0].getBoundingClientRect().left;
+        const b = cells[1].getBoundingClientRect().left;
+        const w = b - a;
+        if (w <= 0) return;
+
+        const gradient =
+            "repeating-linear-gradient(to right," +
+            "transparent 0," +
+            "transparent " + (w - 1) + "px," +
+            "var(--border) " + (w - 1) + "px," +
+            "var(--border) " + w + "px)";
+
+        document.querySelectorAll(".day-head, .g-track").forEach(function (el) {
+            el.style.backgroundImage = gradient;
+        });
+    }
+
+    window.addEventListener("load", syncDayGrid);
+    window.addEventListener("resize", syncDayGrid);
 </script>
 {% endblock %}
