@@ -88,6 +88,11 @@
     .loan-reserved { background: rgba(245, 166, 35, 0.15); color: #fbbf24; border: 1px solid var(--orange); }
     .loan-onloan   { background: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
     .project-cell { font-size: 13px; }
+
+        #usage-period { margin-bottom: 12px; }
+    #usage-period label { font-size: 13px; color: var(--text-muted); }
+    .usage-cell { text-align: right; font-variant-numeric: tabular-nums; }
+
 </style>
 {% endblock %}
 
@@ -170,6 +175,27 @@
     <a href="{% url 'equipment_list' %}{% if show_deleted %}?deleted=1{% endif %}">クリア</a>
 </form>
 
+<div id="usage-period" style="display: none;">
+    <form method="get" class="controls">
+        <input type="hidden" name="q" value="{{ keyword }}">
+        <input type="hidden" name="area" value="{{ selected_area }}">
+        <input type="hidden" name="kind" value="{{ selected_kind }}">
+        <input type="hidden" name="storage" value="{{ selected_storage }}">
+        <input type="hidden" name="loan" value="{{ selected_loan }}">
+        <input type="hidden" name="project" value="{{ selected_project }}">
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="dir" value="{{ direction }}">
+        {% if show_deleted %}<input type="hidden" name="deleted" value="1">{% endif %}
+        <label for="uyear-select">使用回数の集計期間</label>
+        <select name="uyear" id="uyear-select" onchange="this.form.submit()">
+            <option value="all" {% if usage_year == "all" %}selected{% endif %}>全期間</option>
+            {% for y in usage_years %}
+            <option value="{{ y }}" {% if usage_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}年</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
 <div class="column-settings">
     <button type="button" id="toggle-settings" class="secondary">表示設定</button>
     <a href="{% url 'equipment_gantt' %}?{{ pager_params }}" class="btn secondary">ガントチャート</a>
@@ -194,6 +220,7 @@
             <th data-col="storage"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}{% if show_deleted %}&deleted=1{% endif %}&sort=storage_location__name&dir={% if sort == 'storage_location__name' and direction == 'asc' %}desc{% else %}asc{% endif %}">保管場所{% if sort == 'storage_location__name' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>
             <th data-col="loan_status">貸出状況</th>
             <th data-col="project">登録案件</th>
+            <th data-col="usage_count"><a href="?q={{ keyword }}&area={{ selected_area }}&kind={{ selected_kind }}&storage={{ selected_storage }}&loan={{ selected_loan }}&project={{ selected_project }}&uyear={{ usage_year }}{% if show_deleted %}&deleted=1{% endif %}&sort=usage_count&dir={% if sort == 'usage_count' and direction == 'desc' %}asc{% else %}desc{% endif %}">使用回数{% if sort == 'usage_count' %}{% if direction == 'asc' %} ▲{% else %} ▼{% endif %}{% endif %}</a></th>            
             {% if show_deleted %}<th>操作</th>{% endif %}
         </tr>
     </thead>
@@ -208,6 +235,7 @@
             <td data-col="storage">{{ row.equipment.storage_location.name|default:"" }}</td>
             <td data-col="loan_status"><span class="loan-badge loan-{{ row.loan_status_key }}">{{ row.loan_status }}</span></td>
             <td data-col="project" class="project-cell">{{ row.project_names }}</td>
+            <td data-col="usage_count" class="usage-cell">{{ row.usage_count }}</td>
             {% if show_deleted %}
             <td>
                 <form method="post" action="{% url 'equipment_restore' row.equipment.pk %}" style="display: inline;">
@@ -219,7 +247,7 @@
             {% endif %}
         </tr>
         {% empty %}
-        <tr><td colspan="9" class="text-muted">該当するデータがありません。</td></tr>
+        <tr><td colspan="10" class="text-muted">該当するデータがありません。</td></tr>
         {% endfor %}
     </tbody>
 </table>
@@ -279,6 +307,7 @@
         { key: "storage",         label: "保管場所",   required: false, visible: true },
         { key: "loan_status",     label: "貸出状況",   required: false, visible: true },
         { key: "project",         label: "登録案件",   required: false, visible: true },
+        { key: "usage_count",     label: "使用回数",   required: false, visible: false },
     ];
 
     let columns = loadColumns();
@@ -333,6 +362,13 @@
                 }
             });
         });
+
+        // 使用回数の列が表示されているときだけ、期間の選択欄を出す
+        const usageCol = columns.find(c => c.key === "usage_count");
+        const periodBox = document.getElementById("usage-period");
+        if (periodBox) {
+            periodBox.style.display = usageCol && usageCol.visible ? "" : "none";
+        }
     }
 
     function renderPanel() {

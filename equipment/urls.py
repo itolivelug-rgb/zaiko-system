@@ -32,4 +32,5 @@ urlpatterns = [
     path("return/<int:pk>/", views.return_scan, name="return_scan"),
     path("api/next-code/", views.next_code_api, name="next_code_api"),
     path("api/models/", views.model_list_api, name="model_list_api"),    
+    path("<int:pk>/usage/", views.equipment_usage, name="equipment_usage"),    
 ]

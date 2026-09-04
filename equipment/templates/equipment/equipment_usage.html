@@ -1,0 +1,89 @@
+{% extends "equipment/base.html" %}
+
+{% block title %}使用履歴 - 在庫管理システム{% endblock %}
+
+{% block extra_css %}
+<style>
+    .subtitle { color: var(--text-muted); margin: -12px 0 20px; }
+    .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .summary {
+        background: var(--bg-panel);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+    }
+    .summary .period { color: var(--text-muted); font-size: 13px; }
+    .summary .count { font-size: 24px; font-weight: 600; color: var(--accent); }
+    .summary .unit { color: var(--text-muted); font-size: 13px; }
+
+    .date-cell { white-space: nowrap; font-size: 13px; }
+    .notes-cell { white-space: pre-wrap; font-size: 13px; color: var(--text-muted); }
+    .empty-msg { padding: 30px 0; text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-nav">
+    <a href="{% url 'equipment_update' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">← 編集画面へ戻る</a>
+</div>
+
+<h1>使用履歴</h1>
+<p class="subtitle">{{ equipment.management_code }} / {{ equipment.model_name }}{% if equipment.name %}　{{ equipment.name }}{% endif %}</p>
+
+<form method="get" class="controls">
+    {% if return_url %}<input type="hidden" name="next" value="{{ return_url }}">{% endif %}
+    <label for="year-select">表示期間</label>
+    <select name="year" id="year-select" onchange="this.form.submit()">
+        <option value="all" {% if selected_year == "all" %}selected{% endif %}>全期間</option>
+        {% for y in years %}
+        <option value="{{ y }}" {% if selected_year == y|stringformat:"s" %}selected{% endif %}>{{ y }}年</option>
+        {% endfor %}
+    </select>
+</form>
+
+<div class="summary">
+    <span class="period">{{ period_label }}の使用回数</span>
+    <span class="count">{{ usage_count }}</span>
+    <span class="unit">件</span>
+</div>
+
+{% if rows %}
+<table>
+    <thead>
+        <tr>
+            <th style="width: 110px;">貸出日</th>
+            <th style="width: 110px;">返却予定日</th>
+            <th style="width: 110px;">返却日</th>
+            <th>案件名</th>
+            <th style="width: 110px;">担当者</th>
+            <th style="width: 30%;">備考</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td class="date-cell">{{ row.loan_date|date:"Y/n/j (D)" }}</td>
+            <td class="date-cell">{{ row.return_date|date:"Y/n/j (D)" }}</td>
+            <td class="date-cell">
+                {% if row.returned_at %}{{ row.returned_at|date:"Y/n/j (D)" }}{% else %}<span class="text-muted">未返却</span>{% endif %}
+            </td>
+            <td>{{ row.name }}</td>
+            <td>
+                {% if row.manager %}
+                    {{ row.manager.last_name }}{{ row.manager.first_name }}
+                    {% if not row.manager.last_name and not row.manager.first_name %}{{ row.manager.username }}{% endif %}
+                {% else %}―{% endif %}
+            </td>
+            <td class="notes-cell">{{ row.notes }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-msg text-muted">{{ period_label }}の使用履歴はありません。</div>
+{% endif %}
+{% endblock %}

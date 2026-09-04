@@ -1,6 +1,7 @@
 import csv
 import json
 import re
+from django.db.models import Count, Q
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 
@@ -31,6 +32,7 @@ SORTABLE_FIELDS = {
     "area__name",
     "kind__name",
     "storage_location__name",
+    "usage_count",
 }
 def gantt_state(project):
     """ガント表示用の状態を返す（返却待ちは貸出中に含める）"""
@@ -99,8 +101,11 @@ def filter_equipments(request):
     direction = request.GET.get("dir", "asc")
     if sort not in SORTABLE_FIELDS:
         sort = "management_code"
-    order_by = sort if direction == "asc" else f"-{sort}"
-    equipments = equipments.order_by(order_by)
+
+    # usage_count は annotate 後でないと使えないため、呼び出し元で処理する
+    if sort != "usage_count":
+        order_by = sort if direction == "asc" else f"-{sort}"
+        equipments = equipments.order_by(order_by)
 
     conditions = {
         "keyword": keyword,
@@ -119,6 +124,37 @@ def filter_equipments(request):
 @login_required
 def equipment_list(request):
     equipments, cond = filter_equipments(request)
+
+    # --- 使用回数の集計 ---
+    today = timezone.localdate()
+    usage_year = request.GET.get("uyear", str(today.year))
+
+    usage_filter = Q(assignments__checked_out_at__isnull=False) & Q(
+        assignments__project__is_deleted=False
+    )
+    if usage_year != "all":
+        try:
+            y = int(usage_year)
+            usage_filter &= Q(assignments__project__loan_date__year=y)
+        except ValueError:
+            usage_year = str(today.year)
+            usage_filter &= Q(assignments__project__loan_date__year=today.year)
+
+    equipments = equipments.annotate(usage_count=Count("assignments", filter=usage_filter))
+
+    # 使用回数での並び替え
+    if cond["sort"] == "usage_count":
+        order = "usage_count" if cond["direction"] == "asc" else "-usage_count"
+        equipments = equipments.order_by(order, "management_code")
+
+    # 選択肢に出す年（案件のある年）
+    usage_years = sorted(
+        Project.objects.filter(is_deleted=False)
+        .order_by()
+        .values_list("loan_date__year", flat=True)
+        .distinct(),
+        reverse=True,
+    )
 
     paginator = Paginator(equipments, 100)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -142,16 +178,12 @@ def equipment_list(request):
     for e in page_obj:
         info = loan_info.get(e.id)
         if not info:
-            status = "予約なし"
-            status_key = "instock"
-            projects = ""
+            status, status_key, projects = "予約なし", "instock", ""
         elif info["on_loan"]:
-            status = "貸出中"
-            status_key = "onloan"
+            status, status_key = "貸出中", "onloan"
             projects = "、".join(info["projects"])
         else:
-            status = "準備中"
-            status_key = "reserved"
+            status, status_key = "準備中", "reserved"
             projects = "、".join(info["projects"])
 
         rows.append({
@@ -159,9 +191,8 @@ def equipment_list(request):
             "loan_status": status,
             "loan_status_key": status_key,
             "project_names": projects,
+            "usage_count": e.usage_count,
         })
-
-    kinds = Kind.objects.select_related("area").all()
 
     pager_params = urlencode({
         "q": cond["keyword"],
@@ -172,6 +203,7 @@ def equipment_list(request):
         "project": cond["project_id"],
         "sort": cond["sort"],
         "dir": cond["direction"],
+        "uyear": usage_year,
         "deleted": "1" if cond["show_deleted"] else "",
     })
 
@@ -180,20 +212,22 @@ def equipment_list(request):
         "rows": rows,
         "total_count": paginator.count,
         "areas": Area.objects.all(),
-        "all_kinds": kinds,
+        "all_kinds": Kind.objects.select_related("area").all(),
         "storages": StorageLocation.objects.all(),
         "keyword": cond["keyword"],
         "selected_area": cond["area_id"],
         "selected_kind": cond["kind_id"],
         "selected_storage": cond["storage_id"],
+        "selected_loan": cond["loan_status"],
+        "selected_project": cond["project_id"],
+        "projects": [p for p in Project.objects.filter(is_deleted=False).order_by("loan_date") if p.status != "finished"],
         "sort": cond["sort"],
         "direction": cond["direction"],
         "show_deleted": cond["show_deleted"],
         "current_url": request.get_full_path(),
-        "selected_loan": cond["loan_status"],
-        "selected_project": cond["project_id"],
-        "projects": [p for p in Project.objects.filter(is_deleted=False).order_by("loan_date") if p.status != "finished"],
         "pager_params": pager_params,
+        "usage_year": usage_year,
+        "usage_years": usage_years,
     }
     return render(request, "equipment/equipment_list.html", context)
 
@@ -473,6 +507,7 @@ EXPORT_COLUMNS = {
     "storage":         ("保管場所",   lambda e: e.storage_location.name if e.storage_location else ""),
     "loan_status":     ("貸出状況",   lambda e: e.loan_status_label),
     "project":         ("登録案件",   lambda e: e.project_names),
+    "usage_count":     ("使用回数",   lambda e: getattr(e, "usage_count", "")),
     "notes":           ("備考",       lambda e: e.notes),
 }
 
@@ -513,6 +548,18 @@ def equipment_print(request):
     """印刷用ページ（絞り込み結果の全件）"""
     equipments, cond = filter_equipments(request)
     col_keys = get_export_columns(request)
+
+    # 使用回数（cols に含まれる場合のみ集計）
+    if "usage_count" in col_keys:
+        today = timezone.localdate()
+        uyear = request.GET.get("uyear", str(today.year))
+        uf = Q(assignments__checked_out_at__isnull=False) & Q(assignments__project__is_deleted=False)
+        if uyear != "all":
+            try:
+                uf &= Q(assignments__project__loan_date__year=int(uyear))
+            except ValueError:
+                uf &= Q(assignments__project__loan_date__year=today.year)
+        equipments = equipments.annotate(usage_count=Count("assignments", filter=uf))
 
     # 印刷時は領域ごとにまとめる（領域内は画面の並び順を維持）
     inner_sort = cond["sort"] if cond["direction"] == "asc" else f"-{cond['sort']}"
@@ -557,28 +604,52 @@ def equipment_csv(request):
     equipments, cond = filter_equipments(request)
     col_keys = get_export_columns(request)
 
+    # 使用回数（cols に含まれる場合のみ集計）
+    if "usage_count" in col_keys:
+        today = timezone.localdate()
+        uyear = request.GET.get("uyear", str(today.year))
+        uf = Q(assignments__checked_out_at__isnull=False) & Q(assignments__project__is_deleted=False)
+        if uyear != "all":
+            try:
+                uf &= Q(assignments__project__loan_date__year=int(uyear))
+            except ValueError:
+                uf &= Q(assignments__project__loan_date__year=today.year)
+        equipments = equipments.annotate(usage_count=Count("assignments", filter=uf))
+
+        if cond["sort"] == "usage_count":
+            order = "usage_count" if cond["direction"] == "asc" else "-usage_count"
+            equipments = equipments.order_by(order, "management_code")
+
     response = HttpResponse(content_type="text/csv; charset=cp932")
     response.charset = "cp932"
-    filename = f"equipment_{timezone.localtime():%Y%m%d_%H%M}.csv"
+    filename = f"label_{timezone.localtime():%Y%m%d_%H%M}.csv"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
 
-    # Excelで開いたときに文字化けしないようCP932で書き出す
     writer = csv.writer(response, lineterminator="\r\n")
-    writer.writerow([EXPORT_COLUMNS[k][0] for k in col_keys])
     for e in equipments:
-        writer.writerow([EXPORT_COLUMNS[k][1](e) for k in col_keys])
+        writer.writerow([
+            e.management_code,
+            e.area.name,
+            e.name,
+            e.model_name,
+        ])
 
     return response
+
+# テプラ ラベル印刷用の列（Label Editor の差し込み順に合わせる）
+LABEL_COLUMNS = [
+    ("品目コード", lambda e: e.management_code),
+    ("領域",       lambda e: e.area.name),
+    ("名称",       lambda e: e.name),
+    ("機種",       lambda e: e.model_name),
+]
+
 
 @login_required
 @staff_required
 def equipment_label_csv(request):
-    """テプラ用ラベルCSV出力（管理者のみ）"""
+    """テプラ用ラベルCSV出力（管理者のみ、見出し行なし）"""
     equipments, cond = filter_equipments(request)
-
-    # ラベル印刷では領域ごとにまとめる
-    inner_sort = cond["sort"] if cond["direction"] == "asc" else f"-{cond['sort']}"
-    equipments = equipments.order_by("area__id", inner_sort)
 
     response = HttpResponse(content_type="text/csv; charset=cp932")
     response.charset = "cp932"
@@ -1461,3 +1532,62 @@ def model_list_api(request):
         for v in seen.values()
     ]
     return JsonResponse({"models": models})
+
+@login_required
+def equipment_usage(request, pk):
+    """機材の使用履歴"""
+    equipment = get_object_or_404(Equipment, pk=pk)
+    return_url = request.GET.get("next") or ""
+
+    # 貸出中または終了した案件の割り当てのみを対象にする
+    assignments = ProjectEquipment.objects.filter(
+        equipment=equipment,
+        checked_out_at__isnull=False,
+        project__is_deleted=False,
+    ).select_related("project", "project__manager")
+
+    # 選択肢に出す年（データのある年のみ）
+    years = sorted(
+        {a.project.loan_date.year for a in assignments},
+        reverse=True,
+    )
+
+    # 期間の絞り込み
+    today = timezone.localdate()
+    selected = request.GET.get("year", str(today.year))
+
+    if selected == "all":
+        filtered = list(assignments)
+        period_label = "全期間"
+    else:
+        try:
+            year = int(selected)
+        except ValueError:
+            year = today.year
+            selected = str(year)
+        filtered = [a for a in assignments if a.project.loan_date.year == year]
+        period_label = f"{year}年"
+
+    filtered.sort(key=lambda a: a.project.loan_date, reverse=True)
+
+    rows = []
+    for a in filtered:
+        p = a.project
+        rows.append({
+            "loan_date": p.loan_date,
+            "return_date": p.return_date,
+            "returned_at": a.returned_at,
+            "name": p.name,
+            "manager": p.manager,
+            "notes": p.notes,
+        })
+
+    return render(request, "equipment/equipment_usage.html", {
+        "equipment": equipment,
+        "rows": rows,
+        "years": years,
+        "selected_year": selected,
+        "period_label": period_label,
+        "usage_count": len(rows),
+        "return_url": return_url,
+    })

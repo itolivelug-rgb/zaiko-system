@@ -102,10 +102,11 @@
                 <button type="submit" class="sub" data-action="continue">続けて登録</button>
                 {% endif %}
                 {% if equipment %}
-                <span class="sub-actions">
-                    <a href="{% url 'equipment_history' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">更新履歴</a>
-                    <a href="{% url 'equipment_delete' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}" class="delete-link">削除</a>
-                </span>
+            <span class="sub-actions">
+                <a href="{% url 'equipment_history' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">更新履歴</a>
+                <a href="{% url 'equipment_usage' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}">使用履歴</a>
+                <a href="{% url 'equipment_delete' equipment.pk %}{% if return_url %}?next={{ return_url|urlencode }}{% endif %}" class="delete-link">削除</a>
+            </span>
                 {% endif %}
             </div>
         </form>
